@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { RefreshCw, AlertCircle } from "lucide-react";
+import { RefreshCw, AlertCircle, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // ─── CONFIGURAÇÃO DE STATUS / ORIGEM ───────────────────────────────────────────
@@ -33,7 +33,7 @@ const fmtFull = (v: string) =>
   }) : "—";
 
 // ─── STAT CARD ────────────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent: string }) {
+function StatCard({ label, value, sub, accent, icon: Icon }: { label: string; value: string | number; sub?: string; accent: string; icon?: any }) {
   return (
     <div style={{
       background: "rgba(255,255,255,0.04)",
@@ -51,13 +51,16 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string 
         width: 80, height: 80,
         background: `radial-gradient(circle at top right, ${accent}22, transparent 70%)`,
       }} />
-      <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
-        {label}
-      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {Icon && <Icon size={14} style={{ color: accent }} />}
+        <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
+          {label}
+        </span>
+      </div>
       <span style={{ fontSize: 38, fontWeight: 700, color: "#F9FAFB", fontFamily: "'Cabinet Grotesk', 'DM Sans', sans-serif", lineHeight: 1 }}>
         {value}
       </span>
-      {sub && <span style={{ fontSize: 12, color: accent, fontFamily: "'DM Mono', monospace" }}>{sub}</span>}
+      {sub && <span style={{ fontSize: 12, color: accent, fontFamily: "'DM Mono', monospace", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>}
     </div>
   );
 }
@@ -181,7 +184,18 @@ export default function CRM() {
     const clientes = filtered.filter(l => (l.STATUS || "").toLowerCase() === "cliente" || l.STATUS === "CONCLUIDO").length;
     const abertos = filtered.filter(l => (l.ATENDIMENTO || "").toLowerCase() === "aberto" || l.STATUS === "PENDENTE").length;
     const txConversao = total > 0 ? ((clientes / total) * 100).toFixed(1) : "0";
-    return { total, clientes, abertos, txConversao };
+    
+    // Cálculo do melhor criativo
+    const creativeCounts: Record<string, number> = {};
+    filtered.forEach(l => {
+      if (l.eventId) {
+        creativeCounts[l.eventId] = (creativeCounts[l.eventId] || 0) + 1;
+      }
+    });
+    const sortedCreatives = Object.entries(creativeCounts).sort((a, b) => b[1] - a[1]);
+    const topCreative = sortedCreatives[0] ? { id: sortedCreatives[0][0], count: sortedCreatives[0][1] } : null;
+
+    return { total, clientes, abertos, txConversao, topCreative, creativeCounts };
   }, [filtered]);
 
   // ── Status chart ─────────────────────────────────────────────────────────
@@ -197,6 +211,18 @@ export default function CRM() {
       color: STATUS_CONFIG[k]?.color || "#6B7280",
     })).sort((a, b) => b.value - a.value);
   }, [filtered]);
+
+  // ── Creative chart ───────────────────────────────────────────────────────
+  const creativeData = useMemo(() => {
+    return Object.entries(kpis.creativeCounts)
+      .map(([id, count]) => ({
+        name: id.length > 15 ? id.substring(0, 15) + "..." : id,
+        fullName: id,
+        leads: count
+      }))
+      .sort((a, b) => b.leads - a.leads)
+      .slice(0, 5);
+  }, [kpis.creativeCounts]);
 
   // ── Origem chart ─────────────────────────────────────────────────────────
   const origemData = useMemo(() => {
@@ -328,9 +354,10 @@ export default function CRM() {
         )}
 
         {/* KPI CARDS */}
-        <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 28 }}>
+        <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 28 }}>
           <StatCard label="Total de Leads" value={kpis.total} sub={`com filtros aplicados`} accent="#6EE7FA" />
           <StatCard label="Clientes" value={kpis.clientes} sub="status = cliente/concluido" accent="#00E5A0" />
+          <StatCard label="Melhor Criativo" value={kpis.topCreative ? kpis.topCreative.count : 0} sub={kpis.topCreative ? `ID: ${kpis.topCreative.id}` : "Nenhum detectado"} accent="#F472B6" icon={Trophy} />
           <StatCard label="Tx. Conversão" value={`${kpis.txConversao}%`} sub="leads → clientes" accent="#A78BFA" />
           <StatCard label="Abertos" value={kpis.abertos} sub="aguardando atendimento" accent="#FCD34D" />
         </div>
@@ -354,6 +381,25 @@ export default function CRM() {
                 <Tooltip content={<CustomTooltip />} />
                 <Line type="monotone" dataKey="leads" stroke="#6EE7FA" strokeWidth={2} dot={false} name="Leads" />
               </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Creative Performance */}
+          <div style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 16, padding: 24,
+          }}>
+            <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>
+              Top 5 Criativos
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={creativeData} layout="vertical">
+                <XAxis type="number" hide />
+                <YAxis dataKey="name" type="category" tick={{ fill: "#D1D5DB", fontSize: 10 }} axisLine={false} tickLine={false} width={80} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="leads" fill="#F472B6" radius={[0, 4, 4, 0]} name="Leads" />
+              </BarChart>
             </ResponsiveContainer>
           </div>
 
@@ -382,35 +428,6 @@ export default function CRM() {
                       transition: "width 0.6s ease",
                     }} />
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Origem pie */}
-          <div style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 16, padding: 24,
-            display: "flex", flexDirection: "column",
-          }}>
-            <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>
-              Origem
-            </div>
-            <ResponsiveContainer width="100%" height={130}>
-              <PieChart>
-                <Pie data={origemData} dataKey="value" cx="50%" cy="50%" innerRadius={38} outerRadius={58} paddingAngle={3}>
-                  {origemData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {origemData.map(o => (
-                <div key={o.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 2, background: o.color, flexShrink: 0 }} />
-                  <span style={{ color: "#D1D5DB" }}>{o.name}</span>
-                  <span style={{ marginLeft: "auto", color: o.color, fontFamily: "'DM Mono', monospace" }}>{o.value}</span>
                 </div>
               ))}
             </div>
