@@ -1,10 +1,20 @@
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, ArrowRight, Zap, Shield, BarChart3 } from "lucide-react";
+import { useSession } from "@/components/auth/SessionContextProvider";
+import { ArrowRight, Zap, Shield, BarChart3 } from "lucide-react";
+import { useEffect } from "react";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { session } = useSession();
+
+  // Se já estiver logado, redireciona para o CRM ao carregar a home
+  useEffect(() => {
+    if (session) {
+      navigate('/crm');
+    }
+  }, [session, navigate]);
 
   return (
     <div style={{ 
@@ -51,15 +61,13 @@ const Index = () => {
       <main className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
         <div className="max-w-4xl w-full text-center space-y-12">
           
-          {/* Badge Superior */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 animate-fade-in">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
             <span style={{ fontSize: 11, color: "#6EE7FA", fontFamily: "'DM Mono', monospace", letterSpacing: 2, textTransform: "uppercase" }}>
               Sistema de Gestão Inteligente
             </span>
           </div>
 
-          {/* Título Principal */}
           <div className="space-y-6">
             <h1 style={{ 
               fontSize: "clamp(2.5rem, 8vw, 4.5rem)", 
@@ -82,10 +90,9 @@ const Index = () => {
             </p>
           </div>
 
-          {/* Ações */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <Button 
-              onClick={() => navigate('/crm')}
+              onClick={() => navigate('/login')}
               style={{
                 height: "60px",
                 padding: "0 40px",
@@ -99,7 +106,7 @@ const Index = () => {
               }}
               className="hover:scale-105 active:scale-95"
             >
-              Acessar Dashboard
+              {session ? 'Ir para o Dashboard' : 'Acessar Dashboard'}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             
@@ -121,7 +128,6 @@ const Index = () => {
             </Button>
           </div>
 
-          {/* Features Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-12">
             <div className="glass-card p-8 text-left space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-cyan-400/10 flex items-center justify-center text-cyan-400">
