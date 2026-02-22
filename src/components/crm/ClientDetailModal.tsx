@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { Loader2, Save, Trash2, User, Phone, MessageSquare } from "lucide-react";
+import { Loader2, Save, Trash2, User, Phone, MessageSquare, Share2 } from "lucide-react";
 
 interface ClientDetailModalProps {
   client: any;
@@ -40,6 +40,7 @@ export const ClientDetailModal = ({ client, isOpen, onClose, onUpdate }: ClientD
         ASSUNTO: client.ASSUNTO || "",
         STATUS: client.STATUS || "novo",
         etapa_atendimento: client.etapa_atendimento || "0",
+        ORIGEM: client.ORIGEM || "Orgânico",
       });
     }
   }, [client]);
@@ -133,13 +134,16 @@ export const ClientDetailModal = ({ client, isOpen, onClose, onUpdate }: ClientD
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">Etapa Numérica</Label>
-              <Input 
-                type="number"
-                value={formData.etapa_atendimento} 
-                onChange={(e) => setFormData({...formData, etapa_atendimento: e.target.value})}
-                className="rounded-xl border-slate-200"
-              />
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">Origem do Lead</Label>
+              <div className="relative">
+                <Share2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input 
+                  value={formData.ORIGEM} 
+                  onChange={(e) => setFormData({...formData, ORIGEM: e.target.value})}
+                  className="pl-10 rounded-xl border-slate-200 focus:ring-blue-500"
+                  placeholder="Ex: Instagram, Google, Indicação..."
+                />
+              </div>
             </div>
           </div>
 

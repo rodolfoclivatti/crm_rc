@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell
+  BarChart, Bar, Cell, PieChart, Pie
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { RefreshCw, Trophy, ExternalLink, LayoutGrid, List, LogOut } from "lucide-react";
+import { RefreshCw, Trophy, ExternalLink, LayoutGrid, List, LogOut, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KanbanBoard } from "@/components/crm/KanbanBoard";
 import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
@@ -53,7 +53,7 @@ function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: stri
         width: 80, height: 80,
         background: `radial-gradient(circle at top right, ${accent}22, transparent 70%)`,
       }} />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyBetween: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {Icon && <Icon size={14} style={{ color: accent }} />}
           <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
@@ -153,7 +153,7 @@ export default function CRM() {
       if (filterStatus !== "todos" && status !== filterStatus.toLowerCase()) return false;
       if (search) {
         const q = search.toLowerCase();
-        if (!l.nomewpp?.toLowerCase().includes(q) && !l.telefone?.includes(q) && !l.ASSUNTO?.toLowerCase().includes(q)) return false;
+        if (!l.nomewpp?.toLowerCase().includes(q) && !l.telefone?.includes(q) && !l.ASSUNTO?.toLowerCase().includes(q) && !l.ORIGEM?.toLowerCase().includes(q)) return false;
       }
       return true;
     });
@@ -164,12 +164,29 @@ export default function CRM() {
     const clientes = filtered.filter(l => (l.STATUS || "").toLowerCase() === "cliente").length;
     const novos = filtered.filter(l => (l.STATUS || "").toLowerCase() === "novo" || (l.STATUS || "").toUpperCase() === "PENDENTE").length;
     const txConversao = total > 0 ? ((clientes / total) * 100).toFixed(1) : "0";
+    
+    const originCounts: Record<string, number> = {};
+    filtered.forEach(l => { 
+      const o = l.ORIGEM || "Orgânico";
+      originCounts[o] = (originCounts[o] || 0) + 1; 
+    });
+    
     const creativeCounts: Record<string, number> = {};
     filtered.forEach(l => { if (l.eventId) creativeCounts[l.eventId] = (creativeCounts[l.eventId] || 0) + 1; });
     const sortedCreatives = Object.entries(creativeCounts).sort((a, b) => b[1] - a[1]);
     const topCreative = sortedCreatives[0] ? { id: sortedCreatives[0][0], count: sortedCreatives[0][1] } : null;
-    return { total, clientes, novos, txConversao, topCreative, creativeCounts };
+    
+    return { total, clientes, novos, txConversao, topCreative, creativeCounts, originCounts };
   }, [filtered]);
+
+  const originData = useMemo(() => {
+    const COLORS = ["#6EE7FA", "#A78BFA", "#F472B6", "#00E5A0", "#FCD34D", "#F87171"];
+    return Object.entries(kpis.originCounts).map(([name, value], index) => ({
+      name,
+      value,
+      color: COLORS[index % COLORS.length]
+    })).sort((a, b) => b.value - a.value);
+  }, [kpis.originCounts]);
 
   const statusData = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -284,17 +301,37 @@ export default function CRM() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+          
           <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
-            <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Top 5 Criativos</div>
+            <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Origem dos Leads</div>
             <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={creativeData} layout="vertical">
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" tick={{ fill: "#D1D5DB", fontSize: 10 }} axisLine={false} tickLine={false} width={80} />
+              <PieChart>
+                <Pie
+                  data={originData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={60}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {originData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="leads" fill="#F472B6" radius={[0, 4, 4, 0]} name="Leads" />
-              </BarChart>
+              </PieChart>
             </ResponsiveContainer>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 8 }}>
+              {originData.slice(0, 3).map(o => (
+                <div key={o.name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: o.color }} />
+                  <span style={{ fontSize: 10, color: "#9CA3AF" }}>{o.name}</span>
+                </div>
+              ))}
+            </div>
           </div>
+
           <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
             <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Funil de Status</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -315,7 +352,7 @@ export default function CRM() {
 
         {/* FILTERS */}
         <div className="fade-in" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "20px 24px", marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
-          <input placeholder="Buscar nome, telefone, assunto..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, flex: "1 1 220px" }} />
+          <input placeholder="Buscar nome, telefone, assunto, origem..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, flex: "1 1 220px" }} />
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }}>
             <option value="todos">Todos os status</option>
             {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -340,7 +377,7 @@ export default function CRM() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                      {["Data","Nome","Telefone","Assunto","Status Funil"].map(h => (
+                      {["Data","Nome","Telefone","Origem","Assunto","Status Funil"].map(h => (
                         <th key={h} style={{ padding: "14px 16px", textAlign: "left", fontSize: 10, color: "#6B7280", textTransform: "uppercase", letterSpacing: 1.2, fontFamily: "'DM Mono', monospace", fontWeight: 500, whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
@@ -353,6 +390,11 @@ export default function CRM() {
                           <td style={{ padding: "12px 16px", fontSize: 12, color: "#9CA3AF", fontFamily: "'DM Mono', monospace" }}>{fmtFull(lead.created_at)}</td>
                           <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500 }}>{lead.nomewpp || "—"}</td>
                           <td style={{ padding: "12px 16px", fontSize: 12, color: "#9CA3AF", fontFamily: "'DM Mono', monospace" }}>{lead.telefone || "—"}</td>
+                          <td style={{ padding: "12px 16px" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "#6EE7FA", background: "rgba(110,231,250,0.1)", padding: "2px 8px", borderRadius: 6, textTransform: "uppercase" }}>
+                              {lead.ORIGEM || "Orgânico"}
+                            </span>
+                          </td>
                           <td style={{ padding: "12px 16px", fontSize: 13, color: "#D1D5DB", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lead.ASSUNTO || "—"}</td>
                           <td style={{ padding: "12px 16px" }}><span style={{ background: `${sc.color}18`, color: sc.color, padding: "3px 10px", borderRadius: 99, fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{sc.label}</span></td>
                         </tr>
