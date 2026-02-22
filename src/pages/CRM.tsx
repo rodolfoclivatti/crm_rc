@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { RefreshCw, AlertCircle, Trophy } from "lucide-react";
+import { RefreshCw, AlertCircle, Trophy, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // ─── CONFIGURAÇÃO DE STATUS / ORIGEM ───────────────────────────────────────────
@@ -33,8 +33,8 @@ const fmtFull = (v: string) =>
   }) : "—";
 
 // ─── STAT CARD ────────────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, accent, icon: Icon }: { label: string; value: string | number; sub?: string; accent: string; icon?: any }) {
-  return (
+function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: string; value: string | number; sub?: string; accent: string; icon?: any; href?: string }) {
+  const CardContent = (
     <div style={{
       background: "rgba(255,255,255,0.04)",
       border: "1px solid rgba(255,255,255,0.08)",
@@ -45,17 +45,24 @@ function StatCard({ label, value, sub, accent, icon: Icon }: { label: string; va
       gap: 6,
       position: "relative",
       overflow: "hidden",
-    }}>
+      cursor: href ? "pointer" : "default",
+      transition: "all 0.2s ease",
+    }}
+    className={href ? "hover:bg-white/[0.08] hover:-translate-y-1" : ""}
+    >
       <div style={{
         position: "absolute", top: 0, right: 0,
         width: 80, height: 80,
         background: `radial-gradient(circle at top right, ${accent}22, transparent 70%)`,
       }} />
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {Icon && <Icon size={14} style={{ color: accent }} />}
-        <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
-          {label}
-        </span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {Icon && <Icon size={14} style={{ color: accent }} />}
+          <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
+            {label}
+          </span>
+        </div>
+        {href && <ExternalLink size={12} style={{ color: accent, opacity: 0.6 }} />}
       </div>
       <span style={{ fontSize: 38, fontWeight: 700, color: "#F9FAFB", fontFamily: "'Cabinet Grotesk', 'DM Sans', sans-serif", lineHeight: 1 }}>
         {value}
@@ -63,6 +70,16 @@ function StatCard({ label, value, sub, accent, icon: Icon }: { label: string; va
       {sub && <span style={{ fontSize: 12, color: accent, fontFamily: "'DM Mono', monospace", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>}
     </div>
   );
+
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
+        {CardContent}
+      </a>
+    );
+  }
+
+  return CardContent;
 }
 
 // ─── CUSTOM TOOLTIP ───────────────────────────────────────────────────────────
@@ -357,7 +374,14 @@ export default function CRM() {
         <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 28 }}>
           <StatCard label="Total de Leads" value={kpis.total} sub={`com filtros aplicados`} accent="#6EE7FA" />
           <StatCard label="Clientes" value={kpis.clientes} sub="status = cliente/concluido" accent="#00E5A0" />
-          <StatCard label="Melhor Criativo" value={kpis.topCreative ? kpis.topCreative.count : 0} sub={kpis.topCreative ? `ID: ${kpis.topCreative.id}` : "Nenhum detectado"} accent="#F472B6" icon={Trophy} />
+          <StatCard 
+            label="Melhor Criativo" 
+            value={kpis.topCreative ? kpis.topCreative.count : 0} 
+            sub={kpis.topCreative ? `ID: ${kpis.topCreative.id}` : "Nenhum detectado"} 
+            accent="#F472B6" 
+            icon={Trophy} 
+            href={kpis.topCreative?.id}
+          />
           <StatCard label="Tx. Conversão" value={`${kpis.txConversao}%`} sub="leads → clientes" accent="#A78BFA" />
           <StatCard label="Abertos" value={kpis.abertos} sub="aguardando atendimento" accent="#FCD34D" />
         </div>
