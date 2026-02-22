@@ -1,11 +1,8 @@
 version: '3'
 services:
   crm:
-    image: nginx:alpine
+    image: ghcr.io/rodolfoclivatti/crm_rc:latest
     restart: always
-    volumes:
-      - ./dist:/usr/share/nginx/html
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.crm.rule=Host(`crm.clivattiadv.com.br`)"
