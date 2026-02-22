@@ -1,178 +1,572 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, PieChart, Pie
+} from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import { CRMStats } from "@/components/crm/CRMStats";
-import { ClientTable } from "@/components/crm/ClientTable";
-import { KanbanBoard } from "@/components/crm/KanbanBoard";
-import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
-import { LeadCharts } from "@/components/crm/LeadCharts";
-import { Input } from "@/components/ui/input";
-import { Search, RefreshCw, LayoutGrid, List, Database, BarChart3, Home } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { showError } from "@/utils/toast";
-import { useNavigate } from "react-router-dom";
 
-const CRM = () => {
-  const [clients, setClients] = useState<any[]>([]);
+// ─── CONFIGURAÇÃO DE STATUS / ORIGEM ───────────────────────────────────────────
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  cliente:           { label: "Cliente",           color: "#00E5A0" },
+  contrato_enviado:  { label: "Contrato Enviado",  color: "#6EE7FA" },
+  proposta_enviada:  { label: "Proposta Enviada",  color: "#A78BFA" },
+  followup:          { label: "Follow-up",         color: "#FCD34D" },
+  desqualificado:    { label: "Desqualificado",    color: "#F87171" },
+  perdido:           { label: "Perdido",           color: "#6B7280" },
+  // Fallbacks para os status que já existiam no banco
+  PENDENTE:          { label: "Pendente",          color: "#FCD34D" },
+  "EM ATENDIMENTO":  { label: "Em Atendimento",    color: "#6EE7FA" },
+  CONCLUIDO:         { label: "Concluído",         color: "#00E5A0" },
+};
+
+const ORIGEM_CONFIG: Record<string, { label: string; color: string }> = {
+  google: { label: "Google", color: "#34D399" },
+  meta:   { label: "Meta",   color: "#818CF8" },
+};
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const fmtFull = (v: string) =>
+  v ? new Date(v).toLocaleDateString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+  }) : "—";
+
+// ─── STAT CARD ────────────────────────────────────────────────────────────────
+function StatCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent: string }) {
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: 16,
+      padding: "24px 28px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      <div style={{
+        position: "absolute", top: 0, right: 0,
+        width: 80, height: 80,
+        background: `radial-gradient(circle at top right, ${accent}22, transparent 70%)`,
+      }} />
+      <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
+        {label}
+      </span>
+      <span style={{ fontSize: 38, fontWeight: 700, color: "#F9FAFB", fontFamily: "'Cabinet Grotesk', 'DM Sans', sans-serif", lineHeight: 1 }}>
+        {value}
+      </span>
+      {sub && <span style={{ fontSize: 12, color: accent, fontFamily: "'DM Mono', monospace" }}>{sub}</span>}
+    </div>
+  );
+}
+
+// ─── CUSTOM TOOLTIP ───────────────────────────────────────────────────────────
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{
+      background: "#1A1D27", border: "1px solid rgba(255,255,255,0.12)",
+      borderRadius: 10, padding: "10px 16px", fontFamily: "'DM Mono', monospace",
+    }}>
+      <div style={{ color: "#9CA3AF", fontSize: 11, marginBottom: 4 }}>{label}</div>
+      {payload.map((p: any, i: number) => (
+        <div key={i} style={{ color: p.color || "#F9FAFB", fontSize: 13 }}>
+          {p.name}: <strong>{p.value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── MAIN DASHBOARD ───────────────────────────────────────────────────────────
+export default function CRM() {
+  const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("kanban");
-  const [selectedClient, setSelectedClient] = useState<any>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const navigate = useNavigate();
+  const [useMock, setUseMock] = useState(false);
 
-  const fetchClients = useCallback(async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('dados_cliente')
-        .select('*')
-        .order('created_at', { ascending: false });
+  // Filtros
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("todos");
+  const [filterOrigem, setFilterOrigem] = useState("todos");
+  const [filterAtendimento, setFilterAtendimento] = useState("todos");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
-      if (error) throw error;
-      setClients(data || []);
-    } catch (error: any) {
-      console.error("Erro Supabase:", error);
-      showError("Erro ao carregar: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Tabela
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 15;
 
   useEffect(() => {
-    fetchClients();
+    async function fetchLeads() {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('dados_cliente')
+          .select("*")
+          .order("created_at", { ascending: false });
+        
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+          setUseMock(true);
+          // Se não houver dados, poderíamos gerar mock aqui se desejado
+        } else {
+          setLeads(data);
+          setUseMock(false);
+        }
+      } catch (e: any) {
+        console.error("Erro ao carregar leads:", e);
+        showError("Não foi possível conectar ao banco de dados.");
+        setUseMock(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchLeads();
+  }, []);
 
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'dados_cliente' },
-        () => fetchClients()
-      )
-      .subscribe();
+  // ── Filtered leads ────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    return leads.filter((l) => {
+      const d = new Date(l.created_at);
+      if (dateFrom && d < new Date(dateFrom)) return false;
+      if (dateTo && d > new Date(dateTo + "T23:59:59")) return false;
+      
+      const status = (l.STATUS || "").toUpperCase();
+      if (filterStatus !== "todos" && status !== filterStatus.toUpperCase()) return false;
+      
+      const origem = (l.ORIGEM || "").toLowerCase();
+      if (filterOrigem !== "todos" && origem !== filterOrigem) return false;
+      
+      const atendimento = (l.ATENDIMENTO || "").toLowerCase();
+      if (filterAtendimento !== "todos" && atendimento !== filterAtendimento) return false;
+      
+      if (search) {
+        const q = search.toLowerCase();
+        if (!l.nomewpp?.toLowerCase().includes(q) && 
+            !l.telefone?.includes(q) && 
+            !l.ASSUNTO?.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [leads, search, filterStatus, filterOrigem, filterAtendimento, dateFrom, dateTo]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchClients]);
+  // ── KPIs ─────────────────────────────────────────────────────────────────
+  const kpis = useMemo(() => {
+    const total = filtered.length;
+    const clientes = filtered.filter(l => (l.STATUS || "").toLowerCase() === "cliente" || l.STATUS === "CONCLUIDO").length;
+    const abertos = filtered.filter(l => (l.ATENDIMENTO || "").toLowerCase() === "aberto" || l.STATUS === "PENDENTE").length;
+    const txConversao = total > 0 ? ((clientes / total) * 100).toFixed(1) : "0";
+    return { total, clientes, abertos, txConversao };
+  }, [filtered]);
 
-  const filteredClients = clients.filter(client => 
-    client.nomewpp?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.telefone?.includes(searchTerm) ||
-    client.ASSUNTO?.toLowerCase().includes(searchTerm.toLowerCase())
+  // ── Status chart ─────────────────────────────────────────────────────────
+  const statusData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filtered.forEach(l => {
+      const s = l.STATUS || "SEM STATUS";
+      counts[s] = (counts[s] || 0) + 1;
+    });
+    return Object.entries(counts).map(([k, v]) => ({
+      name: STATUS_CONFIG[k]?.label || k,
+      value: v,
+      color: STATUS_CONFIG[k]?.color || "#6B7280",
+    })).sort((a, b) => b.value - a.value);
+  }, [filtered]);
+
+  // ── Origem chart ─────────────────────────────────────────────────────────
+  const origemData = useMemo(() => {
+    const g = filtered.filter(l => (l.ORIGEM || "").toLowerCase() === "google").length;
+    const m = filtered.filter(l => (l.ORIGEM || "").toLowerCase() === "meta").length;
+    const outro = filtered.length - g - m;
+    const arr = [];
+    if (g) arr.push({ name: "Google", value: g, color: "#34D399" });
+    if (m) arr.push({ name: "Meta", value: m, color: "#818CF8" });
+    if (outro && outro > 0) arr.push({ name: "Outro", value: outro, color: "#6B7280" });
+    return arr;
+  }, [filtered]);
+
+  // ── Timeline chart ────────────────────────────────────────────────────────
+  const timelineData = useMemo(() => {
+    const map: Record<string, number> = {};
+    filtered.forEach(l => {
+      const key = new Date(l.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+      map[key] = (map[key] || 0) + 1;
+    });
+    
+    const uniqueDates = Array.from(new Set(filtered.map(l => 
+      new Date(l.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+    ))).reverse();
+
+    return uniqueDates.map(k => ({ data: k, leads: map[k] })).slice(-30);
+  }, [filtered]);
+
+  // ── Paginated table ───────────────────────────────────────────────────────
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => setPage(1), [search, filterStatus, filterOrigem, filterAtendimento, dateFrom, dateTo]);
+
+  if (loading) return (
+    <div style={{ minHeight: "100vh", background: "#0E1018", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: "#6EE7FA", fontFamily: "'DM Mono', monospace", fontSize: 14, letterSpacing: 2 }}>
+        CARREGANDO DADOS...
+      </div>
+    </div>
   );
 
-  const stats = {
-    totalLeads: clients.length,
-    activeChats: clients.filter(c => c.STATUS === 'EM ATENDIMENTO').length,
-    completed: clients.filter(c => c.STATUS === 'CONCLUIDO').length,
-    pending: clients.filter(c => c.STATUS === 'PENDENTE').length,
+  const inputStyle: React.CSSProperties = {
+    background: "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: 10,
+    color: "#F9FAFB",
+    padding: "9px 14px",
+    fontSize: 13,
+    fontFamily: "'DM Mono', monospace",
+    outline: "none",
   };
 
-  const handleClientClick = (client: any) => {
-    setSelectedClient(client);
-    setIsModalOpen(true);
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    cursor: "pointer",
+    appearance: "none",
+    paddingRight: 32,
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Dashboard de Leads</h1>
-            <p className="text-slate-500 font-medium">Gestão inteligente do seu funil de vendas.</p>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative w-full md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input 
-                placeholder="Buscar lead..." 
-                className="pl-10 bg-white border-slate-200 rounded-xl shadow-sm focus:ring-blue-500"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+    <div style={{
+      minHeight: "100vh",
+      background: "#0E1018",
+      fontFamily: "'DM Sans', sans-serif",
+      color: "#F9FAFB",
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+        input[type='date']::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
+        select option { background: #1A1D27; }
+        .row-hover:hover { background: rgba(255,255,255,0.04) !important; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.4s ease both; }
+      `}</style>
 
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={() => navigate('/')}
-              className="bg-white rounded-xl border-slate-200"
-            >
-              <Home className="h-4 w-4 text-slate-600" />
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={fetchClients}
-              disabled={loading}
-              className="bg-white rounded-xl border-slate-200"
-            >
-              <RefreshCw className={`h-4 w-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "32px 24px" }}>
+
+        {/* HEADER */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 36 }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#6EE7FA", fontFamily: "'DM Mono', monospace", letterSpacing: 2, marginBottom: 6 }}>
+              CRM · PAINEL DE LEADS
+            </div>
+            <h1 style={{ fontSize: 32, fontWeight: 700, letterSpacing: -0.5 }}>
+              Dashboard de Leads
+            </h1>
+          </div>
+          {useMock && (
+            <div style={{
+              background: "rgba(110,231,250,0.08)",
+              border: "1px solid rgba(110,231,250,0.25)",
+              borderRadius: 10,
+              padding: "10px 16px",
+              fontSize: 12,
+              color: "#6EE7FA",
+              fontFamily: "'DM Mono', monospace",
+              maxWidth: 300,
+              lineHeight: 1.5,
+            }}>
+              📊 Sem dados no banco<br/>
+              <span style={{ opacity: 0.7 }}>Aguardando novos leads serem registrados na tabela dados_cliente.</span>
+            </div>
+          )}
+        </div>
+
+        {/* KPI CARDS */}
+        <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 28 }}>
+          <StatCard label="Total de Leads" value={kpis.total} sub={`com filtros aplicados`} accent="#6EE7FA" />
+          <StatCard label="Clientes" value={kpis.clientes} sub="status = cliente/concluido" accent="#00E5A0" />
+          <StatCard label="Tx. Conversão" value={`${kpis.txConversao}%`} sub="leads → clientes" accent="#A78BFA" />
+          <StatCard label="Abertos" value={kpis.abertos} sub="aguardando atendimento" accent="#FCD34D" />
+        </div>
+
+        {/* CHARTS ROW */}
+        <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginBottom: 28 }}>
+
+          {/* Timeline */}
+          <div style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 16, padding: 24,
+          }}>
+            <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>
+              Leads por Período
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={timelineData}>
+                <XAxis dataKey="data" tick={{ fill: "#6B7280", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis tick={{ fill: "#6B7280", fontSize: 10 }} axisLine={false} tickLine={false} width={28} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line type="monotone" dataKey="leads" stroke="#6EE7FA" strokeWidth={2} dot={false} name="Leads" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Status bar */}
+          <div style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 16, padding: 24,
+          }}>
+            <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>
+              Funil de Status
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {statusData.map(s => (
+                <div key={s.name}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: "#D1D5DB" }}>{s.name}</span>
+                    <span style={{ color: s.color, fontFamily: "'DM Mono', monospace" }}>{s.value}</span>
+                  </div>
+                  <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 99, height: 5 }}>
+                    <div style={{
+                      background: s.color,
+                      borderRadius: 99,
+                      height: "100%",
+                      width: `${filtered.length > 0 ? (s.value / filtered.length * 100).toFixed(0) : 0}%`,
+                      transition: "width 0.6s ease",
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Origem pie */}
+          <div style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 16, padding: 24,
+            display: "flex", flexDirection: "column",
+          }}>
+            <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>
+              Origem
+            </div>
+            <ResponsiveContainer width="100%" height={130}>
+              <PieChart>
+                <Pie data={origemData} dataKey="value" cx="50%" cy="50%" innerRadius={38} outerRadius={58} paddingAngle={3}>
+                  {origemData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {origemData.map(o => (
+                <div key={o.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: o.color, flexShrink: 0 }} />
+                  <span style={{ color: "#D1D5DB" }}>{o.name}</span>
+                  <span style={{ marginLeft: "auto", color: o.color, fontFamily: "'DM Mono', monospace" }}>{o.value}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <CRMStats {...stats} />
+        {/* FILTERS */}
+        <div className="fade-in" style={{
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 16,
+          padding: "20px 24px",
+          marginBottom: 16,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 12,
+          alignItems: "center",
+        }}>
+          <input
+            placeholder="Buscar nome, telefone, assunto..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ ...inputStyle, flex: "1 1 220px" }}
+          />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-              {activeTab === 'kanban' ? 'Fluxo de Atendimento' : activeTab === 'table' ? 'Base de Clientes' : 'Análise de Dados'}
-              <span className="text-sm font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                {filteredClients.length}
-              </span>
-            </h2>
-            
-            <TabsList className="bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-              <TabsTrigger value="kanban" className="rounded-lg data-[state=active]:bg-slate-100 data-[state=active]:text-blue-600">
-                <LayoutGrid className="h-4 w-4 mr-2" />
-                Kanban
-              </TabsTrigger>
-              <TabsTrigger value="table" className="rounded-lg data-[state=active]:bg-slate-100 data-[state=active]:text-blue-600">
-                <List className="h-4 w-4 mr-2" />
-                Lista
-              </TabsTrigger>
-              <TabsTrigger value="charts" className="rounded-lg data-[state=active]:bg-slate-100 data-[state=active]:text-blue-600">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Gráficos
-              </TabsTrigger>
-            </TabsList>
+          <div style={{ position: "relative" }}>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle}>
+              <option value="todos">Todos os status</option>
+              {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
           </div>
 
-          {loading ? (
-            <div className="h-[400px] flex items-center justify-center bg-white rounded-3xl border border-dashed border-slate-200">
-              <div className="flex flex-col items-center gap-4">
-                <RefreshCw className="h-8 w-8 text-blue-500 animate-spin" />
-                <p className="text-slate-500 font-medium">Carregando seus dados...</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <TabsContent value="kanban" className="mt-0">
-                <KanbanBoard clients={filteredClients} onClientClick={handleClientClick} />
-              </TabsContent>
-              <TabsContent value="table" className="mt-0">
-                <ClientTable clients={filteredClients} />
-              </TabsContent>
-              <TabsContent value="charts" className="mt-0">
-                <LeadCharts data={clients} />
-              </TabsContent>
-            </>
-          )}
-        </Tabs>
-      </div>
+          <div style={{ position: "relative" }}>
+            <select value={filterOrigem} onChange={e => setFilterOrigem(e.target.value)} style={selectStyle}>
+              <option value="todos">Toda origem</option>
+              <option value="google">Google</option>
+              <option value="meta">Meta</option>
+            </select>
+          </div>
 
-      <ClientDetailModal 
-        client={selectedClient}
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onUpdate={fetchClients}
-      />
+          <div style={{ position: "relative" }}>
+            <select value={filterAtendimento} onChange={e => setFilterAtendimento(e.target.value)} style={selectStyle}>
+              <option value="todos">Atendimento</option>
+              <option value="aberto">Aberto</option>
+              <option value="fechado">Fechado</option>
+            </select>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...inputStyle, width: 150 }} />
+            <span style={{ color: "#6B7280", fontSize: 12 }}>até</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ ...inputStyle, width: 150 }} />
+          </div>
+
+          {(search || filterStatus !== "todos" || filterOrigem !== "todos" || filterAtendimento !== "todos" || dateFrom || dateTo) && (
+            <button onClick={() => { setSearch(""); setFilterStatus("todos"); setFilterOrigem("todos"); setFilterAtendimento("todos"); setDateFrom(""); setDateTo(""); }}
+              style={{
+                background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.3)",
+                borderRadius: 8, color: "#F87171", padding: "9px 16px", fontSize: 12,
+                cursor: "pointer", fontFamily: "'DM Mono', monospace",
+              }}>
+              Limpar filtros
+            </button>
+          )}
+        </div>
+
+        {/* TABLE */}
+        <div className="fade-in" style={{
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 16,
+          overflow: "hidden",
+        }}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                  {["Data","Nome","Telefone","Origem","Assunto","Atendimento","Status Funil","Criativo"].map(h => (
+                    <th key={h} style={{
+                      padding: "14px 16px", textAlign: "left",
+                      fontSize: 10, color: "#6B7280", textTransform: "uppercase",
+                      letterSpacing: 1.2, fontFamily: "'DM Mono', monospace", fontWeight: 500,
+                      whiteSpace: "nowrap",
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((lead) => {
+                  const statusKey = lead.STATUS || "SEM STATUS";
+                  const sc = STATUS_CONFIG[statusKey] || { label: statusKey, color: "#6B7280" };
+                  const origemKey = (lead.ORIGEM || "").toLowerCase();
+                  const oc = ORIGEM_CONFIG[origemKey] || { color: "#9CA3AF" };
+                  return (
+                    <tr key={lead.id} className="row-hover" style={{
+                      borderBottom: "1px solid rgba(255,255,255,0.04)",
+                      transition: "background 0.15s",
+                    }}>
+                      <td style={{ padding: "12px 16px", fontSize: 12, color: "#9CA3AF", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>
+                        {fmtFull(lead.created_at)}
+                      </td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>
+                        {lead.nomewpp || "—"}
+                      </td>
+                      <td style={{ padding: "12px 16px", fontSize: 12, color: "#9CA3AF", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>
+                        {lead.telefone || "—"}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <span style={{
+                          background: `${oc.color}22`,
+                          color: oc.color,
+                          padding: "3px 10px", borderRadius: 99,
+                          fontSize: 11, fontFamily: "'DM Mono', monospace",
+                          textTransform: "capitalize",
+                        }}>
+                          {lead.ORIGEM || "—"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, color: "#D1D5DB", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {lead.ASSUNTO || "—"}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <span style={{
+                          background: (lead.ATENDIMENTO || "").toLowerCase() === "aberto" ? "rgba(253,211,77,0.12)" : "rgba(55,65,81,0.5)",
+                          color: (lead.ATENDIMENTO || "").toLowerCase() === "aberto" ? "#FCD34D" : "#9CA3AF",
+                          padding: "3px 10px", borderRadius: 99,
+                          fontSize: 11, fontFamily: "'DM Mono', monospace", textTransform: "capitalize",
+                        }}>
+                          {lead.ATENDIMENTO || "—"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <span style={{
+                          background: `${sc.color}18`,
+                          color: sc.color,
+                          padding: "3px 10px", borderRadius: 99,
+                          fontSize: 11, fontFamily: "'DM Mono', monospace",
+                        }}>
+                          {sc.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        {lead.eventId
+                          ? <a href={lead.eventId} target="_blank" rel="noopener noreferrer"
+                              style={{ color: "#818CF8", fontSize: 11, fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
+                              ver criativo ↗
+                            </a>
+                          : <span style={{ color: "#4B5563", fontSize: 11 }}>—</span>
+                        }
+                      </td>
+                    </tr>
+                  );
+                })}
+                {paginated.length === 0 && (
+                  <tr>
+                    <td colSpan={8} style={{ padding: 48, textAlign: "center", color: "#4B5563", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
+                      Nenhum lead encontrado com os filtros aplicados.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* PAGINATION */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "14px 24px",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+          }}>
+            <span style={{ fontSize: 12, color: "#6B7280", fontFamily: "'DM Mono', monospace" }}>
+              {filtered.length} leads · página {page} de {totalPages || 1}
+            </span>
+            <div style={{ display: "flex", gap: 6 }}>
+              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => setPage(p)} style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: p === page ? "rgba(110,231,250,0.15)" : "rgba(255,255,255,0.04)",
+                  border: p === page ? "1px solid rgba(110,231,250,0.4)" : "1px solid rgba(255,255,255,0.06)",
+                  color: p === page ? "#6EE7FA" : "#9CA3AF",
+                  cursor: "pointer", fontSize: 12, fontFamily: "'DM Mono', monospace",
+                }}>
+                  {p}
+                </button>
+              ))}
+              {totalPages > 7 && page < totalPages && (
+                <button onClick={() => setPage(page + 1)} style={{
+                  height: 32, padding: "0 12px", borderRadius: 8,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  color: "#9CA3AF", cursor: "pointer", fontSize: 12, fontFamily: "'DM Mono', monospace",
+                }}>
+                  próxima →
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
-};
-
-export default CRM;
+}
