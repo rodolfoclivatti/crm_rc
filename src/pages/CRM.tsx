@@ -51,9 +51,9 @@ function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: stri
       <div style={{
         position: "absolute", top: 0, right: 0,
         width: 80, height: 80,
-        background: radial-gradient(circle at top right, ${accent}22, transparent 70%),
+        background: `radial-gradient(circle at top right, ${accent}22, transparent 70%)`,
       }} />
-      <div style={{ display: "flex", alignItems: "center", justify-content: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {Icon && <Icon size={14} style={{ color: accent }} />}
           <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
@@ -300,7 +300,7 @@ export default function CRM() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {statusData.map(s => (
                 <div key={s.name}>
-                  <div style={{ display: "flex", justify-content: "space-between", fontSize: 12, marginBottom: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
                     <span style={{ color: "#D1D5DB" }}>{s.name}</span>
                     <span style={{ color: s.color, fontFamily: "'DM Mono', monospace" }}>{s.value}</span>
                   </div>
@@ -361,7 +361,7 @@ export default function CRM() {
                   </tbody>
                 </table>
               </div>
-              <div style={{ display: "flex", alignItems: "center", justify-content: "space-between", padding: "14px 24px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                 <span style={{ fontSize: 12, color: "#6B7280", fontFamily: "'DM Mono', monospace" }}>{filtered.length} leads · página {page} de {totalPages || 1}</span>
                 <div style={{ display: "flex", gap: 6 }}>
                   {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
