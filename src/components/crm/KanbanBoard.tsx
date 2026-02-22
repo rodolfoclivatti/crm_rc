@@ -29,22 +29,29 @@ interface KanbanBoardProps {
   onClientClick: (client: Client) => void;
 }
 
-// Colunas baseadas no STATUS_CONFIG do CRM.tsx, ordenadas pelo fluxo do funil
+// Colunas baseadas na nova estrutura solicitada
 const KANBAN_COLUMNS = [
-  { id: 'PENDENTE', title: 'Pendente', color: '#FCD34D', icon: Clock },
-  { id: 'EM ATENDIMENTO', title: 'Em Atendimento', color: '#6EE7FA', icon: PlayCircle },
-  { id: 'followup', title: 'Follow-up', color: '#FCD34D', icon: MessageSquare },
-  { id: 'proposta_enviada', title: 'Proposta Enviada', color: '#A78BFA', icon: Send },
-  { id: 'contrato_enviado', title: 'Contrato Enviado', color: '#6EE7FA', icon: FileText },
+  { id: 'novo', title: 'Novo', color: '#FCD34D', icon: Clock },
+  { id: 'followup', title: 'Follow-up', color: '#A78BFA', icon: MessageSquare },
+  { id: 'proposta_enviada', title: 'Proposta Enviada', color: '#6EE7FA', icon: Send },
+  { id: 'contrato_enviado', title: 'Contrato Enviado', color: '#3B82F6', icon: FileText },
   { id: 'cliente', title: 'Cliente', color: '#00E5A0', icon: UserCheck },
-  { id: 'CONCLUIDO', title: 'Concluído', color: '#00E5A0', icon: CheckCircle },
   { id: 'desqualificado', title: 'Desqualificado', color: '#F87171', icon: AlertCircle },
   { id: 'perdido', title: 'Perdido', color: '#6B7280', icon: XCircle },
 ];
 
 export const KanbanBoard = ({ clients, onClientClick }: KanbanBoardProps) => {
-  const getClientsByStatus = (status: string) => 
-    clients.filter(c => (c.STATUS || 'PENDENTE').toUpperCase() === status.toUpperCase());
+  const getClientsByStatus = (status: string) => {
+    const s = status.toLowerCase();
+    return clients.filter(c => {
+      const clientStatus = (c.STATUS || 'novo').toLowerCase();
+      // Mapeamento de compatibilidade para dados antigos
+      if (s === 'novo' && clientStatus === 'pendente') return true;
+      if (s === 'followup' && clientStatus === 'em atendimento') return true;
+      if (s === 'cliente' && clientStatus === 'concluido') return true;
+      return clientStatus === s;
+    });
+  };
 
   return (
     <div className="flex gap-6 overflow-x-auto pb-6 min-h-[600px] custom-scrollbar">

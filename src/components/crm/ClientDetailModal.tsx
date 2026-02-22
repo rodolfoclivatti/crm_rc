@@ -38,7 +38,7 @@ export const ClientDetailModal = ({ client, isOpen, onClose, onUpdate }: ClientD
         nomewpp: client.nomewpp || "",
         telefone: client.telefone || "",
         ASSUNTO: client.ASSUNTO || "",
-        STATUS: client.STATUS || "PENDENTE",
+        STATUS: client.STATUS || "novo",
         etapa_atendimento: client.etapa_atendimento || "0",
       });
     }
@@ -51,7 +51,7 @@ export const ClientDetailModal = ({ client, isOpen, onClose, onUpdate }: ClientD
         .from('dados_cliente')
         .update({
           ...formData,
-          STATUS: formData.STATUS.toUpperCase() // Garante consistência no banco
+          STATUS: formData.STATUS.toLowerCase()
         })
         .eq('id', client.id);
 
@@ -113,7 +113,7 @@ export const ClientDetailModal = ({ client, isOpen, onClose, onUpdate }: ClientD
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">Fase do Funil (Status)</Label>
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">Fase do Funil</Label>
               <Select 
                 value={formData.STATUS} 
                 onValueChange={(v) => setFormData({...formData, STATUS: v})}
@@ -122,9 +122,13 @@ export const ClientDetailModal = ({ client, isOpen, onClose, onUpdate }: ClientD
                   <SelectValue placeholder="Selecione a fase" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="PENDENTE">Novos Leads</SelectItem>
-                  <SelectItem value="EM ATENDIMENTO">Em Atendimento</SelectItem>
-                  <SelectItem value="CONCLUIDO">Concluído</SelectItem>
+                  <SelectItem value="novo">Novo</SelectItem>
+                  <SelectItem value="followup">Follow-up</SelectItem>
+                  <SelectItem value="proposta_enviada">Proposta Enviada</SelectItem>
+                  <SelectItem value="contrato_enviado">Contrato Enviado</SelectItem>
+                  <SelectItem value="cliente">Cliente</SelectItem>
+                  <SelectItem value="desqualificado">Desqualificado</SelectItem>
+                  <SelectItem value="perdido">Perdido</SelectItem>
                 </SelectContent>
               </Select>
             </div>

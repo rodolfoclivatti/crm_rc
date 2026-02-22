@@ -11,16 +11,18 @@ import { KanbanBoard } from "@/components/crm/KanbanBoard";
 import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
 
 // ─── CONFIGURAÇÃO DE STATUS / ORIGEM ───────────────────────────────────────────
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  novo:              { label: "Novo",              color: "#FCD34D" },
+  followup:          { label: "Follow-up",         color: "#A78BFA" },
+  proposta_enviada:  { label: "Proposta Enviada",  color: "#6EE7FA" },
+  contrato_enviado:  { label: "Contrato Enviado",  color: "#3B82F6" },
   cliente:           { label: "Cliente",           color: "#00E5A0" },
-  contrato_enviado:  { label: "Contrato Enviado",  color: "#6EE7FA" },
-  proposta_enviada:  { label: "Proposta Enviada",  color: "#A78BFA" },
-  followup:          { label: "Follow-up",         color: "#FCD34D" },
   desqualificado:    { label: "Desqualificado",    color: "#F87171" },
   perdido:           { label: "Perdido",           color: "#6B7280" },
-  PENDENTE:          { label: "Pendente",          color: "#FCD34D" },
-  "EM ATENDIMENTO":  { label: "Em Atendimento",    color: "#6EE7FA" },
-  CONCLUIDO:         { label: "Concluído",         color: "#00E5A0" },
+  // Fallbacks para dados legados
+  PENDENTE:          { label: "Novo",              color: "#FCD34D" },
+  "EM ATENDIMENTO":  { label: "Follow-up",         color: "#A78BFA" },
+  CONCLUIDO:         { label: "Cliente",           color: "#00E5A0" },
 };
 
 const ORIGEM_CONFIG: Record<string, { label: string; color: string }> = {
@@ -57,7 +59,7 @@ function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: stri
         width: 80, height: 80,
         background: `radial-gradient(circle at top right, ${accent}22, transparent 70%)`,
       }} />
-      <div style={{ display: "flex", alignItems: "center", justifyBetween: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {Icon && <Icon size={14} style={{ color: accent }} />}
           <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
@@ -114,8 +116,6 @@ export default function CRM() {
   // Filtros
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("todos");
-  const [filterOrigem, setFilterOrigem] = useState("todos");
-  const [filterAtendimento, setFilterAtendimento] = useState("todos");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -157,35 +157,34 @@ export default function CRM() {
       const d = new Date(l.created_at);
       if (dateFrom && d < new Date(dateFrom)) return false;
       if (dateTo && d > new Date(dateTo + "T23:59:59")) return false;
-      const status = (l.STATUS || "").toUpperCase();
-      if (filterStatus !== "todos" && status !== filterStatus.toUpperCase()) return false;
-      const origem = (l.ORIGEM || "").toLowerCase();
-      if (filterOrigem !== "todos" && origem !== filterOrigem) return false;
-      const atendimento = (l.ATENDIMENTO || "").toLowerCase();
-      if (filterAtendimento !== "todos" && atendimento !== filterAtendimento) return false;
+      const status = (l.STATUS || "").toLowerCase();
+      if (filterStatus !== "todos" && status !== filterStatus.toLowerCase()) return false;
       if (search) {
         const q = search.toLowerCase();
         if (!l.nomewpp?.toLowerCase().includes(q) && !l.telefone?.includes(q) && !l.ASSUNTO?.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [leads, search, filterStatus, filterOrigem, filterAtendimento, dateFrom, dateTo]);
+  }, [leads, search, filterStatus, dateFrom, dateTo]);
 
   const kpis = useMemo(() => {
     const total = filtered.length;
-    const clientes = filtered.filter(l => (l.STATUS || "").toLowerCase() === "cliente" || l.STATUS === "CONCLUIDO").length;
-    const abertos = filtered.filter(l => (l.ATENDIMENTO || "").toLowerCase() === "aberto" || l.STATUS === "PENDENTE").length;
+    const clientes = filtered.filter(l => (l.STATUS || "").toLowerCase() === "cliente").length;
+    const novos = filtered.filter(l => (l.STATUS || "").toLowerCase() === "novo" || (l.STATUS || "").toUpperCase() === "PENDENTE").length;
     const txConversao = total > 0 ? ((clientes / total) * 100).toFixed(1) : "0";
     const creativeCounts: Record<string, number> = {};
     filtered.forEach(l => { if (l.eventId) creativeCounts[l.eventId] = (creativeCounts[l.eventId] || 0) + 1; });
     const sortedCreatives = Object.entries(creativeCounts).sort((a, b) => b[1] - a[1]);
     const topCreative = sortedCreatives[0] ? { id: sortedCreatives[0][0], count: sortedCreatives[0][1] } : null;
-    return { total, clientes, abertos, txConversao, topCreative, creativeCounts };
+    return { total, clientes, novos, txConversao, topCreative, creativeCounts };
   }, [filtered]);
 
   const statusData = useMemo(() => {
     const counts: Record<string, number> = {};
-    filtered.forEach(l => { const s = l.STATUS || "SEM STATUS"; counts[s] = (counts[s] || 0) + 1; });
+    filtered.forEach(l => { 
+      const s = l.STATUS || "novo"; 
+      counts[s] = (counts[s] || 0) + 1; 
+    });
     return Object.entries(counts).map(([k, v]) => ({
       name: STATUS_CONFIG[k]?.label || k,
       value: v,
@@ -279,10 +278,10 @@ export default function CRM() {
         {/* KPI CARDS */}
         <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 28 }}>
           <StatCard label="Total de Leads" value={kpis.total} sub={`com filtros aplicados`} accent="#6EE7FA" />
-          <StatCard label="Clientes" value={kpis.clientes} sub="status = cliente/concluido" accent="#00E5A0" />
+          <StatCard label="Clientes" value={kpis.clientes} sub="status = cliente" accent="#00E5A0" />
           <StatCard label="Melhor Criativo" value={kpis.topCreative ? kpis.topCreative.count : 0} sub={kpis.topCreative ? `ID: ${kpis.topCreative.id}` : "Nenhum detectado"} accent="#F472B6" icon={Trophy} href={kpis.topCreative?.id} />
           <StatCard label="Tx. Conversão" value={`${kpis.txConversao}%`} sub="leads → clientes" accent="#A78BFA" />
-          <StatCard label="Abertos" value={kpis.abertos} sub="aguardando atendimento" accent="#FCD34D" />
+          <StatCard label="Novos Leads" value={kpis.novos} sub="aguardando atendimento" accent="#FCD34D" />
         </div>
 
         {/* CHARTS ROW */}
