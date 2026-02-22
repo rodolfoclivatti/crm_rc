@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, PieChart, Pie
@@ -14,7 +14,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   followup:          { label: "Follow-up",         color: "#FCD34D" },
   desqualificado:    { label: "Desqualificado",    color: "#F87171" },
   perdido:           { label: "Perdido",           color: "#6B7280" },
-  // Fallbacks para os status que já existiam no banco
   PENDENTE:          { label: "Pendente",          color: "#FCD34D" },
   "EM ATENDIMENTO":  { label: "Em Atendimento",    color: "#6EE7FA" },
   CONCLUIDO:         { label: "Concluído",         color: "#00E5A0" },
@@ -30,6 +29,31 @@ const fmtFull = (v: string) =>
   v ? new Date(v).toLocaleDateString("pt-BR", {
     day: "2-digit", month: "2-digit", year: "numeric",
   }) : "—";
+
+function generateMockData() {
+  const statuses = Object.keys(STATUS_CONFIG);
+  const origens = ["google", "meta"];
+  const assuntos = ["Consultoria Jurídica", "Divórcio", "Inventário", "Cível", "Trabalhista"];
+  const nomes = ["Ana Silva", "Bruno Costa", "Carla Mendes", "Diego Rocha", "Elena Freitas"];
+  const data = [];
+  const now = new Date();
+  for (let i = 0; i < 50; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - Math.floor(Math.random() * 30));
+    data.push({
+      id: i + 1,
+      created_at: d.toISOString(),
+      nomewpp: nomes[Math.floor(Math.random() * nomes.length)],
+      telefone: `(11) 9${Math.floor(Math.random() * 9000 + 1000)}-${Math.floor(Math.random() * 9000 + 1000)}`,
+      ORIGEM: origens[Math.floor(Math.random() * 2)],
+      ASSUNTO: assuntos[Math.floor(Math.random() * assuntos.length)],
+      ATENDIMENTO: Math.random() > 0.5 ? "aberto" : "fechado",
+      STATUS: statuses[Math.floor(Math.random() * statuses.length)],
+      eventId: Math.random() > 0.7 ? "https://meta.com/ad/123" : null,
+    });
+  }
+  return data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
 
 // ─── STAT CARD ────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent: string }) {
@@ -97,34 +121,48 @@ export default function CRM() {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 15;
 
-  useEffect(() => {
-    async function fetchLeads() {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('dados_cliente')
-          .select("*")
-          .order("created_at", { ascending: false });
-        
-        if (error) throw error;
-        
-        if (!data || data.length === 0) {
-          setUseMock(true);
-          // Se não houver dados, poderíamos gerar mock aqui se desejado
-        } else {
-          setLeads(data);
-          setUseMock(false);
-        }
-      } catch (e: any) {
-        console.error("Erro ao carregar leads:", e);
-        showError("Não foi possível conectar ao banco de dados.");
+  const fetchLeads = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('dados_cliente')
+        .select("*")
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        setLeads(generateMockData());
         setUseMock(true);
-      } finally {
-        setLoading(false);
+      } else {
+        setLeads(data);
+        setUseMock(false);
       }
+    } catch (e: any) {
+      console.error("Erro ao carregar leads:", e);
+      setLeads(generateMockData());
+      setUseMock(true);
+    } finally {
+      setLoading(false);
     }
-    fetchLeads();
   }, []);
+
+  useEffect(() => {
+    fetchLeads();
+
+    // Real-time subscription
+    const channel = supabase
+      .channel('db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'dados_cliente' },
+        () => fetchLeads()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchLeads]);
 
   // ── Filtered leads ────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -278,8 +316,8 @@ export default function CRM() {
               maxWidth: 300,
               lineHeight: 1.5,
             }}>
-              📊 Sem dados no banco<br/>
-              <span style={{ opacity: 0.7 }}>Aguardando novos leads serem registrados na tabela dados_cliente.</span>
+              📊 Modo demonstração<br/>
+              <span style={{ opacity: 0.7 }}>Exibindo dados fictícios porque a tabela dados_cliente está vazia ou inacessível.</span>
             </div>
           )}
         </div>
