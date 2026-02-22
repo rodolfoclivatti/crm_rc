@@ -4,7 +4,9 @@ import {
   BarChart, Bar, Cell, PieChart, Pie
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import { showError } from "@/utils/toast";
+import { showError, showSuccess } from "@/utils/toast";
+import { RefreshCw, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // ─── CONFIGURAÇÃO DE STATUS / ORIGEM ───────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -82,6 +84,7 @@ function CustomTooltip({ active, payload, label }: any) {
 export default function CRM() {
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Filtros
   const [search, setSearch] = useState("");
@@ -97,16 +100,30 @@ export default function CRM() {
 
   const fetchLeads = useCallback(async () => {
     try {
+      setLoading(true);
+      setErrorMsg(null);
+      console.log("[CRM] Buscando dados da tabela 'dados_cliente'...");
+      
       const { data, error } = await supabase
         .from('dados_cliente')
         .select("*")
         .order("created_at", { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error("[CRM] Erro Supabase:", error);
+        throw error;
+      }
+      
+      console.log("[CRM] Dados recebidos:", data?.length || 0, "registros");
       setLeads(data || []);
+      
+      if (data && data.length > 0) {
+        showSuccess(`${data.length} leads carregados.`);
+      }
     } catch (e: any) {
-      console.error("Erro ao carregar leads:", e);
-      showError("Erro ao conectar com o banco de dados.");
+      const msg = e.message || "Erro desconhecido";
+      setErrorMsg(msg);
+      showError("Erro ao conectar: " + msg);
     } finally {
       setLoading(false);
     }
@@ -115,13 +132,15 @@ export default function CRM() {
   useEffect(() => {
     fetchLeads();
 
-    // Real-time subscription
     const channel = supabase
       .channel('db-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'dados_cliente' },
-        () => fetchLeads()
+        () => {
+          console.log("[CRM] Mudança detectada no banco, atualizando...");
+          fetchLeads();
+        }
       )
       .subscribe();
 
@@ -212,10 +231,10 @@ export default function CRM() {
 
   useEffect(() => setPage(1), [search, filterStatus, filterOrigem, filterAtendimento, dateFrom, dateTo]);
 
-  if (loading) return (
+  if (loading && leads.length === 0) return (
     <div style={{ minHeight: "100vh", background: "#0E1018", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ color: "#6EE7FA", fontFamily: "'DM Mono', monospace", fontSize: 14, letterSpacing: 2 }}>
-        CARREGANDO DADOS REAIS...
+        CONECTANDO AO SUPABASE...
       </div>
     </div>
   );
@@ -270,21 +289,43 @@ export default function CRM() {
               Dashboard de Leads
             </h1>
           </div>
-          <div style={{
-            background: "rgba(110,231,250,0.08)",
-            border: "1px solid rgba(110,231,250,0.25)",
-            borderRadius: 10,
-            padding: "10px 16px",
-            fontSize: 12,
-            color: "#6EE7FA",
-            fontFamily: "'DM Mono', monospace",
-            maxWidth: 300,
-            lineHeight: 1.5,
-          }}>
-            📡 Conectado ao Supabase<br/>
-            <span style={{ opacity: 0.7 }}>Exibindo dados reais da tabela dados_cliente.</span>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <Button 
+              variant="outline" 
+              onClick={fetchLeads} 
+              disabled={loading}
+              className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+            <div style={{
+              background: "rgba(110,231,250,0.08)",
+              border: "1px solid rgba(110,231,250,0.25)",
+              borderRadius: 10,
+              padding: "10px 16px",
+              fontSize: 12,
+              color: "#6EE7FA",
+              fontFamily: "'DM Mono', monospace",
+              maxWidth: 300,
+              lineHeight: 1.5,
+            }}>
+              📡 Status: {loading ? "Sincronizando..." : "Conectado"}<br/>
+              <span style={{ opacity: 0.7 }}>Tabela: dados_cliente</span>
+            </div>
           </div>
         </div>
+
+        {errorMsg && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400">
+            <AlertCircle size={20} />
+            <div className="text-sm">
+              <p className="font-bold">Erro de Conexão:</p>
+              <p>{errorMsg}</p>
+              <p className="mt-2 text-xs opacity-70">Dica: Verifique se as políticas de RLS no Supabase permitem a leitura da tabela 'dados_cliente'.</p>
+            </div>
+          </div>
+        )}
 
         {/* KPI CARDS */}
         <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 28 }}>
@@ -523,10 +564,10 @@ export default function CRM() {
                     </tr>
                   );
                 })}
-                {paginated.length === 0 && (
+                {paginated.length === 0 && !loading && (
                   <tr>
                     <td colSpan={8} style={{ padding: 48, textAlign: "center", color: "#4B5563", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
-                      Nenhum lead encontrado no banco de dados.
+                      Nenhum lead encontrado. Verifique se há dados na tabela 'dados_cliente' e se o RLS permite a leitura.
                     </td>
                   </tr>
                 )}
