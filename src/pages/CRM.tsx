@@ -1,26 +1,27 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CRMStats } from "@/components/crm/CRMStats";
 import { ClientTable } from "@/components/crm/ClientTable";
 import { KanbanBoard } from "@/components/crm/KanbanBoard";
 import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
+import { LeadCharts } from "@/components/crm/LeadCharts";
 import { Input } from "@/components/ui/input";
-import { Search, RefreshCw, LayoutGrid, List, Plus, LogOut, Database } from "lucide-react";
+import { Search, RefreshCw, LayoutGrid, List, LogOut, Database, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { showError, showSuccess } from "@/utils/toast";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { showError } from "@/utils/toast";
 import { useNavigate } from "react-router-dom";
 
 const CRM = () => {
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [view, setView] = useState<"table" | "kanban">("kanban");
+  const [activeTab, setActiveTab] = useState("kanban");
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
 
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -36,7 +37,7 @@ const CRM = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchClients();
@@ -53,7 +54,7 @@ const CRM = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchClients]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -84,8 +85,8 @@ const CRM = () => {
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1">
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Pipeline de Vendas</h1>
-            <p className="text-slate-500 font-medium">Acompanhe seus leads e converta mais clientes.</p>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Dashboard de Leads</h1>
+            <p className="text-slate-500 font-medium">Gestão inteligente do seu funil de vendas.</p>
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
@@ -98,19 +99,6 @@ const CRM = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            
-            <Tabs value={view} onValueChange={(v: any) => setView(v)} className="bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-              <TabsList className="bg-transparent border-none">
-                <TabsTrigger value="kanban" className="rounded-lg data-[state=active]:bg-slate-100 data-[state=active]:text-blue-600">
-                  <LayoutGrid className="h-4 w-4 mr-2" />
-                  Kanban
-                </TabsTrigger>
-                <TabsTrigger value="table" className="rounded-lg data-[state=active]:bg-slate-100 data-[state=active]:text-blue-600">
-                  <List className="h-4 w-4 mr-2" />
-                  Lista
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
 
             <Button 
               variant="outline" 
@@ -137,14 +125,29 @@ const CRM = () => {
         <CRMStats {...stats} />
 
         {/* Main Content Section */}
-        <div className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-              {view === 'kanban' ? 'Fluxo de Atendimento' : 'Base de Clientes'}
+              {activeTab === 'kanban' ? 'Fluxo de Atendimento' : activeTab === 'table' ? 'Base de Clientes' : 'Análise de Dados'}
               <span className="text-sm font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                 {filteredClients.length}
               </span>
             </h2>
+            
+            <TabsList className="bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+              <TabsTrigger value="kanban" className="rounded-lg data-[state=active]:bg-slate-100 data-[state=active]:text-blue-600">
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Kanban
+              </TabsTrigger>
+              <TabsTrigger value="table" className="rounded-lg data-[state=active]:bg-slate-100 data-[state=active]:text-blue-600">
+                <List className="h-4 w-4 mr-2" />
+                Lista
+              </TabsTrigger>
+              <TabsTrigger value="charts" className="rounded-lg data-[state=active]:bg-slate-100 data-[state=active]:text-blue-600">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Gráficos
+              </TabsTrigger>
+            </TabsList>
           </div>
 
           {loading ? (
@@ -170,13 +173,19 @@ const CRM = () => {
               </div>
             </div>
           ) : (
-            view === "kanban" ? (
-              <KanbanBoard clients={filteredClients} onClientClick={handleClientClick} />
-            ) : (
-              <ClientTable clients={filteredClients} />
-            )
+            <>
+              <TabsContent value="kanban" className="mt-0">
+                <KanbanBoard clients={filteredClients} onClientClick={handleClientClick} />
+              </TabsContent>
+              <TabsContent value="table" className="mt-0">
+                <ClientTable clients={filteredClients} />
+              </TabsContent>
+              <TabsContent value="charts" className="mt-0">
+                <LeadCharts data={clients} />
+              </TabsContent>
+            </>
           )}
-        </div>
+        </Tabs>
       </div>
 
       <ClientDetailModal 
