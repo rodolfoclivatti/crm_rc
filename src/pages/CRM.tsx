@@ -5,11 +5,12 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { RefreshCw, Trophy, ExternalLink, LayoutGrid, List } from "lucide-react";
+import { RefreshCw, Trophy, ExternalLink, LayoutGrid, List, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KanbanBoard } from "@/components/crm/KanbanBoard";
 import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNavigate } from "react-router-dom";
 
 // ─── CONFIGURAÇÃO DE STATUS / ORIGEM ───────────────────────────────────────────
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -23,11 +24,6 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   PENDENTE:          { label: "Novo",              color: "#FCD34D" },
   "EM ATENDIMENTO":  { label: "Follow-up",         color: "#A78BFA" },
   CONCLUIDO:         { label: "Cliente",           color: "#00E5A0" },
-};
-
-const ORIGEM_CONFIG: Record<string, { label: string; color: string }> = {
-  google: { label: "Google", color: "#34D399" },
-  meta:   { label: "Meta",   color: "#818CF8" },
 };
 
 const fmtFull = (v: string) =>
@@ -55,9 +51,9 @@ function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: stri
       <div style={{
         position: "absolute", top: 0, right: 0,
         width: 80, height: 80,
-        background: `radial-gradient(circle at top right, ${accent}22, transparent 70%)`,
+        background: radial-gradient(circle at top right, ${accent}22, transparent 70%),
       }} />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justify-content: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {Icon && <Icon size={14} style={{ color: accent }} />}
           <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
@@ -102,6 +98,7 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export default function CRM() {
+  const navigate = useNavigate();
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('kanban');
@@ -132,6 +129,11 @@ export default function CRM() {
       setLoading(false);
     }
   }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
 
   useEffect(() => {
     fetchLeads();
@@ -254,6 +256,9 @@ export default function CRM() {
             <Button variant="outline" onClick={fetchLeads} disabled={loading} className="bg-white/5 border-white/10 text-white hover:bg-white/10 h-11 rounded-xl">
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
             </Button>
+            <Button variant="ghost" onClick={handleLogout} className="text-white/40 hover:text-red-400 hover:bg-red-400/10 h-11 rounded-xl px-3">
+              <LogOut size={18} />
+            </Button>
           </div>
         </div>
 
@@ -295,7 +300,7 @@ export default function CRM() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {statusData.map(s => (
                 <div key={s.name}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                  <div style={{ display: "flex", justify-content: "space-between", fontSize: 12, marginBottom: 4 }}>
                     <span style={{ color: "#D1D5DB" }}>{s.name}</span>
                     <span style={{ color: s.color, fontFamily: "'DM Mono', monospace" }}>{s.value}</span>
                   </div>
@@ -356,7 +361,7 @@ export default function CRM() {
                   </tbody>
                 </table>
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "center", justify-content: "space-between", padding: "14px 24px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                 <span style={{ fontSize: 12, color: "#6B7280", fontFamily: "'DM Mono', monospace" }}>{filtered.length} leads · página {page} de {totalPages || 1}</span>
                 <div style={{ display: "flex", gap: 6 }}>
                   {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
