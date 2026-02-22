@@ -5,10 +5,11 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { RefreshCw, AlertCircle, Trophy, ExternalLink, LayoutGrid, List } from "lucide-react";
+import { RefreshCw, Trophy, ExternalLink, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KanbanBoard } from "@/components/crm/KanbanBoard";
 import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // ─── CONFIGURAÇÃO DE STATUS / ORIGEM ───────────────────────────────────────────
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -19,7 +20,6 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   cliente:           { label: "Cliente",           color: "#00E5A0" },
   desqualificado:    { label: "Desqualificado",    color: "#F87171" },
   perdido:           { label: "Perdido",           color: "#6B7280" },
-  // Fallbacks para dados legados
   PENDENTE:          { label: "Novo",              color: "#FCD34D" },
   "EM ATENDIMENTO":  { label: "Follow-up",         color: "#A78BFA" },
   CONCLUIDO:         { label: "Cliente",           color: "#00E5A0" },
@@ -30,13 +30,11 @@ const ORIGEM_CONFIG: Record<string, { label: string; color: string }> = {
   meta:   { label: "Meta",   color: "#818CF8" },
 };
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
 const fmtFull = (v: string) =>
   v ? new Date(v).toLocaleDateString("pt-BR", {
     day: "2-digit", month: "2-digit", year: "numeric",
   }) : "—";
 
-// ─── STAT CARD ────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: string; value: string | number; sub?: string; accent: string; icon?: any; href?: string }) {
   const CardContent = (
     <div style={{
@@ -86,7 +84,6 @@ function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: stri
   return CardContent;
 }
 
-// ─── CUSTOM TOOLTIP ───────────────────────────────────────────────────────────
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
@@ -104,30 +101,24 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-// ─── MAIN DASHBOARD ───────────────────────────────────────────────────────────
 export default function CRM() {
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('kanban');
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Filtros
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("todos");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  // Tabela
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 15;
 
   const fetchLeads = useCallback(async () => {
     try {
       setLoading(true);
-      setErrorMsg(null);
-      
       const { data, error } = await supabase
         .from('dados_cliente')
         .select("*")
@@ -136,7 +127,6 @@ export default function CRM() {
       if (error) throw error;
       setLeads(data || []);
     } catch (e: any) {
-      setErrorMsg(e.message);
       showError("Erro ao conectar: " + e.message);
     } finally {
       setLoading(false);
@@ -250,26 +240,18 @@ export default function CRM() {
             <div style={{ fontSize: 11, color: "#6EE7FA", fontFamily: "'DM Mono', monospace", letterSpacing: 2, marginBottom: 6 }}>CRM · PAINEL DE LEADS</div>
             <h1 style={{ fontSize: 32, fontWeight: 700, letterSpacing: -0.5 }}>Dashboard de Leads</h1>
           </div>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setViewMode('kanban')}
-                className={`rounded-lg ${viewMode === 'kanban' ? 'bg-blue-600 text-white' : 'text-white/40 hover:text-white'}`}
-              >
-                <LayoutGrid size={16} className="mr-2" /> Kanban
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setViewMode('table')}
-                className={`rounded-lg ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'text-white/40 hover:text-white'}`}
-              >
-                <List size={16} className="mr-2" /> Tabela
-              </Button>
-            </div>
-            <Button variant="outline" onClick={fetchLeads} disabled={loading} className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+            <Tabs value={viewMode} onValueChange={(v: any) => setViewMode(v)} className="bg-white/5 p-1 rounded-xl border border-white/10">
+              <TabsList className="bg-transparent border-none h-9">
+                <TabsTrigger value="kanban" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white text-white/40">
+                  <LayoutGrid size={14} className="mr-2" /> Kanban
+                </TabsTrigger>
+                <TabsTrigger value="table" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white text-white/40">
+                  <List size={14} className="mr-2" /> Lista
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Button variant="outline" onClick={fetchLeads} disabled={loading} className="bg-white/5 border-white/10 text-white hover:bg-white/10 h-11 rounded-xl">
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
             </Button>
           </div>
@@ -353,7 +335,7 @@ export default function CRM() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                      {["Data","Nome","Telefone","Origem","Assunto","Status Funil","Criativo"].map(h => (
+                      {["Data","Nome","Telefone","Assunto","Status Funil"].map(h => (
                         <th key={h} style={{ padding: "14px 16px", textAlign: "left", fontSize: 10, color: "#6B7280", textTransform: "uppercase", letterSpacing: 1.2, fontFamily: "'DM Mono', monospace", fontWeight: 500, whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
@@ -361,16 +343,13 @@ export default function CRM() {
                   <tbody>
                     {paginated.map((lead) => {
                       const sc = STATUS_CONFIG[lead.STATUS] || { label: lead.STATUS, color: "#6B7280" };
-                      const oc = ORIGEM_CONFIG[lead.ORIGEM?.toLowerCase()] || { color: "#9CA3AF" };
                       return (
                         <tr key={lead.id} className="row-hover" onClick={() => handleLeadClick(lead)} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "background 0.15s", cursor: "pointer" }}>
                           <td style={{ padding: "12px 16px", fontSize: 12, color: "#9CA3AF", fontFamily: "'DM Mono', monospace" }}>{fmtFull(lead.created_at)}</td>
                           <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500 }}>{lead.nomewpp || "—"}</td>
                           <td style={{ padding: "12px 16px", fontSize: 12, color: "#9CA3AF", fontFamily: "'DM Mono', monospace" }}>{lead.telefone || "—"}</td>
-                          <td style={{ padding: "12px 16px" }}><span style={{ background: `${oc.color}22`, color: oc.color, padding: "3px 10px", borderRadius: 99, fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{lead.ORIGEM || "—"}</span></td>
-                          <td style={{ padding: "12px 16px", fontSize: 13, color: "#D1D5DB", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lead.ASSUNTO || "—"}</td>
+                          <td style={{ padding: "12px 16px", fontSize: 13, color: "#D1D5DB", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lead.ASSUNTO || "—"}</td>
                           <td style={{ padding: "12px 16px" }}><span style={{ background: `${sc.color}18`, color: sc.color, padding: "3px 10px", borderRadius: 99, fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{sc.label}</span></td>
-                          <td style={{ padding: "12px 16px" }}>{lead.eventId ? <a href={lead.eventId} target="_blank" rel="noopener noreferrer" style={{ color: "#818CF8", fontSize: 11, fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>ver criativo ↗</a> : <span style={{ color: "#4B5563", fontSize: 11 }}>—</span>}</td>
                         </tr>
                       );
                     })}
