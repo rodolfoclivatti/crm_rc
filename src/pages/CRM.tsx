@@ -6,7 +6,7 @@ import { KanbanBoard } from "@/components/crm/KanbanBoard";
 import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
 import { LeadCharts } from "@/components/crm/LeadCharts";
 import { Input } from "@/components/ui/input";
-import { Search, RefreshCw, LayoutGrid, List, LogOut, Database, BarChart3 } from "lucide-react";
+import { Search, RefreshCw, LayoutGrid, List, Database, BarChart3, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { showError } from "@/utils/toast";
@@ -56,11 +56,6 @@ const CRM = () => {
     };
   }, [fetchClients]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
-
   const filteredClients = clients.filter(client => 
     client.nomewpp?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     client.telefone?.includes(searchTerm) ||
@@ -82,7 +77,6 @@ const CRM = () => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1">
             <h1 className="text-4xl font-black text-slate-900 tracking-tight">Dashboard de Leads</h1>
@@ -103,10 +97,10 @@ const CRM = () => {
             <Button 
               variant="outline" 
               size="icon" 
-              onClick={handleLogout}
-              className="bg-white rounded-xl border-slate-200 text-red-500 hover:text-red-600"
+              onClick={() => navigate('/')}
+              className="bg-white rounded-xl border-slate-200"
             >
-              <LogOut className="h-4 w-4" />
+              <Home className="h-4 w-4 text-slate-600" />
             </Button>
             
             <Button 
@@ -121,10 +115,8 @@ const CRM = () => {
           </div>
         </div>
 
-        {/* Stats Section */}
         <CRMStats {...stats} />
 
-        {/* Main Content Section */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -155,21 +147,6 @@ const CRM = () => {
               <div className="flex flex-col items-center gap-4">
                 <RefreshCw className="h-8 w-8 text-blue-500 animate-spin" />
                 <p className="text-slate-500 font-medium">Carregando seus dados...</p>
-              </div>
-            </div>
-          ) : clients.length === 0 ? (
-            <div className="h-[400px] flex items-center justify-center bg-white rounded-3xl border border-dashed border-slate-200">
-              <div className="flex flex-col items-center gap-4 text-center max-w-xs">
-                <div className="p-4 bg-slate-50 rounded-full">
-                  <Database className="h-8 w-8 text-slate-400" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-800">Nenhum dado encontrado</h3>
-                <p className="text-slate-500 text-sm">
-                  Sua tabela <code className="bg-slate-100 px-1 rounded">dados_cliente</code> parece estar vazia ou as políticas de RLS estão bloqueando o acesso.
-                </p>
-                <Button onClick={fetchClients} variant="outline" className="rounded-xl">
-                  Tentar novamente
-                </Button>
               </div>
             </div>
           ) : (
