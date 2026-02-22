@@ -2,15 +2,21 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CRMStats } from "@/components/crm/CRMStats";
 import { ClientTable } from "@/components/crm/ClientTable";
+import { KanbanBoard } from "@/components/crm/KanbanBoard";
+import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
 import { Input } from "@/components/ui/input";
-import { Search, RefreshCw } from "lucide-react";
+import { Search, RefreshCw, LayoutGrid, List, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { showSuccess, showError } from "@/utils/toast";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { showError } from "@/utils/toast";
 
 const CRM = () => {
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [view, setView] = useState<"table" | "kanban">("kanban");
+  const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchClients = async () => {
     try {
@@ -32,7 +38,6 @@ const CRM = () => {
   useEffect(() => {
     fetchClients();
 
-    // Real-time subscription
     const channel = supabase
       .channel('schema-db-changes')
       .on(
@@ -60,46 +65,90 @@ const CRM = () => {
     pending: clients.filter(c => c.STATUS === 'PENDENTE').length,
   };
 
+  const handleClientClick = (client: any) => {
+    setSelectedClient(client);
+    setIsModalOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">CRM de Atendimento</h1>
-            <p className="text-slate-500">Gerencie seus leads e atendimentos em tempo real.</p>
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-1">
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Pipeline de Vendas</h1>
+            <p className="text-slate-500 font-medium">Acompanhe seus leads e converta mais clientes.</p>
           </div>
-          <div className="flex items-center gap-2">
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input 
+                placeholder="Buscar lead..." 
+                className="pl-10 bg-white border-slate-200 rounded-xl shadow-sm focus:ring-blue-500"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            <Tabs value={view} onValueChange={(v: any) => setView(v)} className="bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+              <TabsList className="bg-transparent border-none">
+                <TabsTrigger value="kanban" className="rounded-lg data-[state=active]:bg-slate-100 data-[state=active]:text-blue-600">
+                  <LayoutGrid className="h-4 w-4 mr-2" />
+                  Kanban
+                </TabsTrigger>
+                <TabsTrigger value="table" className="rounded-lg data-[state=active]:bg-slate-100 data-[state=active]:text-blue-600">
+                  <List className="h-4 w-4 mr-2" />
+                  Lista
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-100 px-6">
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Lead
+            </Button>
+            
             <Button 
               variant="outline" 
               size="icon" 
               onClick={fetchClients}
               disabled={loading}
-              className="bg-white"
+              className="bg-white rounded-xl border-slate-200"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
             </Button>
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input 
-                placeholder="Buscar cliente ou assunto..." 
-                className="pl-10 bg-white border-slate-200"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
           </div>
         </div>
 
+        {/* Stats Section */}
         <CRMStats {...stats} />
 
-        <div className="space-y-4">
+        {/* Main Content Section */}
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-slate-800">Lista de Clientes</h2>
-            <span className="text-sm text-slate-500">{filteredClients.length} registros encontrados</span>
+            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              {view === 'kanban' ? 'Fluxo de Atendimento' : 'Base de Clientes'}
+              <span className="text-sm font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                {filteredClients.length}
+              </span>
+            </h2>
           </div>
-          <ClientTable clients={filteredClients} />
+
+          {view === "kanban" ? (
+            <KanbanBoard clients={filteredClients} onClientClick={handleClientClick} />
+          ) : (
+            <ClientTable clients={filteredClients} />
+          )}
         </div>
       </div>
+
+      <ClientDetailModal 
+        client={selectedClient}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onUpdate={fetchClients}
+      />
     </div>
   );
 };
