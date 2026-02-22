@@ -5,10 +5,11 @@ import { ClientTable } from "@/components/crm/ClientTable";
 import { KanbanBoard } from "@/components/crm/KanbanBoard";
 import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
 import { Input } from "@/components/ui/input";
-import { Search, RefreshCw, LayoutGrid, List, Plus } from "lucide-react";
+import { Search, RefreshCw, LayoutGrid, List, Plus, LogOut, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { showError } from "@/utils/toast";
+import { showError, showSuccess } from "@/utils/toast";
+import { useNavigate } from "react-router-dom";
 
 const CRM = () => {
   const [clients, setClients] = useState<any[]>([]);
@@ -17,6 +18,7 @@ const CRM = () => {
   const [view, setView] = useState<"table" | "kanban">("kanban");
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   const fetchClients = async () => {
     try {
@@ -29,7 +31,8 @@ const CRM = () => {
       if (error) throw error;
       setClients(data || []);
     } catch (error: any) {
-      showError("Erro ao carregar clientes: " + error.message);
+      console.error("Erro Supabase:", error);
+      showError("Erro ao carregar: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -51,6 +54,11 @@ const CRM = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
 
   const filteredClients = clients.filter(client => 
     client.nomewpp?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -104,9 +112,13 @@ const CRM = () => {
               </TabsList>
             </Tabs>
 
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-100 px-6">
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Lead
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleLogout}
+              className="bg-white rounded-xl border-slate-200 text-red-500 hover:text-red-600"
+            >
+              <LogOut className="h-4 w-4" />
             </Button>
             
             <Button 
@@ -135,10 +147,34 @@ const CRM = () => {
             </h2>
           </div>
 
-          {view === "kanban" ? (
-            <KanbanBoard clients={filteredClients} onClientClick={handleClientClick} />
+          {loading ? (
+            <div className="h-[400px] flex items-center justify-center bg-white rounded-3xl border border-dashed border-slate-200">
+              <div className="flex flex-col items-center gap-4">
+                <RefreshCw className="h-8 w-8 text-blue-500 animate-spin" />
+                <p className="text-slate-500 font-medium">Carregando seus dados...</p>
+              </div>
+            </div>
+          ) : clients.length === 0 ? (
+            <div className="h-[400px] flex items-center justify-center bg-white rounded-3xl border border-dashed border-slate-200">
+              <div className="flex flex-col items-center gap-4 text-center max-w-xs">
+                <div className="p-4 bg-slate-50 rounded-full">
+                  <Database className="h-8 w-8 text-slate-400" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">Nenhum dado encontrado</h3>
+                <p className="text-slate-500 text-sm">
+                  Sua tabela <code className="bg-slate-100 px-1 rounded">dados_cliente</code> parece estar vazia ou as políticas de RLS estão bloqueando o acesso.
+                </p>
+                <Button onClick={fetchClients} variant="outline" className="rounded-xl">
+                  Tentar novamente
+                </Button>
+              </div>
+            </div>
           ) : (
-            <ClientTable clients={filteredClients} />
+            view === "kanban" ? (
+              <KanbanBoard clients={filteredClients} onClientClick={handleClientClick} />
+            ) : (
+              <ClientTable clients={filteredClients} />
+            )
           )}
         </div>
       </div>
