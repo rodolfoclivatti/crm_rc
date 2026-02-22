@@ -30,31 +30,6 @@ const fmtFull = (v: string) =>
     day: "2-digit", month: "2-digit", year: "numeric",
   }) : "—";
 
-function generateMockData() {
-  const statuses = Object.keys(STATUS_CONFIG);
-  const origens = ["google", "meta"];
-  const assuntos = ["Consultoria Jurídica", "Divórcio", "Inventário", "Cível", "Trabalhista"];
-  const nomes = ["Ana Silva", "Bruno Costa", "Carla Mendes", "Diego Rocha", "Elena Freitas"];
-  const data = [];
-  const now = new Date();
-  for (let i = 0; i < 50; i++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - Math.floor(Math.random() * 30));
-    data.push({
-      id: i + 1,
-      created_at: d.toISOString(),
-      nomewpp: nomes[Math.floor(Math.random() * nomes.length)],
-      telefone: `(11) 9${Math.floor(Math.random() * 9000 + 1000)}-${Math.floor(Math.random() * 9000 + 1000)}`,
-      ORIGEM: origens[Math.floor(Math.random() * 2)],
-      ASSUNTO: assuntos[Math.floor(Math.random() * assuntos.length)],
-      ATENDIMENTO: Math.random() > 0.5 ? "aberto" : "fechado",
-      STATUS: statuses[Math.floor(Math.random() * statuses.length)],
-      eventId: Math.random() > 0.7 ? "https://meta.com/ad/123" : null,
-    });
-  }
-  return data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-}
-
 // ─── STAT CARD ────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent: string }) {
   return (
@@ -107,7 +82,6 @@ function CustomTooltip({ active, payload, label }: any) {
 export default function CRM() {
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [useMock, setUseMock] = useState(false);
 
   // Filtros
   const [search, setSearch] = useState("");
@@ -129,18 +103,10 @@ export default function CRM() {
         .order("created_at", { ascending: false });
       
       if (error) throw error;
-      
-      if (!data || data.length === 0) {
-        setLeads(generateMockData());
-        setUseMock(true);
-      } else {
-        setLeads(data);
-        setUseMock(false);
-      }
+      setLeads(data || []);
     } catch (e: any) {
       console.error("Erro ao carregar leads:", e);
-      setLeads(generateMockData());
-      setUseMock(true);
+      showError("Erro ao conectar com o banco de dados.");
     } finally {
       setLoading(false);
     }
@@ -249,7 +215,7 @@ export default function CRM() {
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#0E1018", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ color: "#6EE7FA", fontFamily: "'DM Mono', monospace", fontSize: 14, letterSpacing: 2 }}>
-        CARREGANDO DADOS...
+        CARREGANDO DADOS REAIS...
       </div>
     </div>
   );
@@ -304,22 +270,20 @@ export default function CRM() {
               Dashboard de Leads
             </h1>
           </div>
-          {useMock && (
-            <div style={{
-              background: "rgba(110,231,250,0.08)",
-              border: "1px solid rgba(110,231,250,0.25)",
-              borderRadius: 10,
-              padding: "10px 16px",
-              fontSize: 12,
-              color: "#6EE7FA",
-              fontFamily: "'DM Mono', monospace",
-              maxWidth: 300,
-              lineHeight: 1.5,
-            }}>
-              📊 Modo demonstração<br/>
-              <span style={{ opacity: 0.7 }}>Exibindo dados fictícios porque a tabela dados_cliente está vazia ou inacessível.</span>
-            </div>
-          )}
+          <div style={{
+            background: "rgba(110,231,250,0.08)",
+            border: "1px solid rgba(110,231,250,0.25)",
+            borderRadius: 10,
+            padding: "10px 16px",
+            fontSize: 12,
+            color: "#6EE7FA",
+            fontFamily: "'DM Mono', monospace",
+            maxWidth: 300,
+            lineHeight: 1.5,
+          }}>
+            📡 Conectado ao Supabase<br/>
+            <span style={{ opacity: 0.7 }}>Exibindo dados reais da tabela dados_cliente.</span>
+          </div>
         </div>
 
         {/* KPI CARDS */}
@@ -562,7 +526,7 @@ export default function CRM() {
                 {paginated.length === 0 && (
                   <tr>
                     <td colSpan={8} style={{ padding: 48, textAlign: "center", color: "#4B5563", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
-                      Nenhum lead encontrado com os filtros aplicados.
+                      Nenhum lead encontrado no banco de dados.
                     </td>
                   </tr>
                 )}
