@@ -32,7 +32,7 @@ const fmtFull = (v: string) =>
     day: "2-digit", month: "2-digit", year: "numeric",
   }) : "—";
 
-function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: string; value: string | number; sub?: string; accent: string; icon?: any; href?: string }) {
+function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: string; value: string | number; sub?: React.ReactNode; accent: string; icon?: any; href?: string }) {
   const CardContent = (
     <div style={{
       background: "rgba(255,255,255,0.04)",
@@ -46,6 +46,7 @@ function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: stri
       overflow: "hidden",
       cursor: href ? "pointer" : "default",
       transition: "all 0.2s ease",
+      minHeight: "140px"
     }}
     className={href ? "hover:bg-white/[0.08] hover:-translate-y-1" : ""}
     >
@@ -66,7 +67,11 @@ function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: stri
       <span style={{ fontSize: 38, fontWeight: 700, color: "#F9FAFB", fontFamily: "'Cabinet Grotesk', 'DM Sans', sans-serif", lineHeight: 1 }}>
         {value}
       </span>
-      {sub && <span style={{ fontSize: 12, color: accent, fontFamily: "'DM Mono', monospace", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>}
+      {sub && (
+        <div style={{ fontSize: 11, color: accent, fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
+          {sub}
+        </div>
+      )}
     </div>
   );
 
@@ -172,7 +177,8 @@ export default function CRM() {
 
   const kpis = useMemo(() => {
     const total = filtered.length;
-    const clientes = filtered.filter(l => (l.STATUS || "").toLowerCase() === "cliente").length;
+    const clientesList = filtered.filter(l => (l.STATUS || "").toLowerCase() === "cliente");
+    const clientes = clientesList.length;
     const novos = filtered.filter(l => (l.STATUS || "").toLowerCase() === "novo" || (l.STATUS || "").toUpperCase() === "PENDENTE").length;
     const txConversao = total > 0 ? ((clientes / total) * 100).toFixed(1) : "0";
     
@@ -181,13 +187,19 @@ export default function CRM() {
       const o = l.ORIGEM || "Orgânico";
       originCounts[o] = (originCounts[o] || 0) + 1; 
     });
+
+    const clientOriginCounts: Record<string, number> = {};
+    clientesList.forEach(l => {
+      const o = l.ORIGEM || "Orgânico";
+      clientOriginCounts[o] = (clientOriginCounts[o] || 0) + 1;
+    });
     
     const creativeCounts: Record<string, number> = {};
     filtered.forEach(l => { if (l.eventId) creativeCounts[l.eventId] = (creativeCounts[l.eventId] || 0) + 1; });
     const sortedCreatives = Object.entries(creativeCounts).sort((a, b) => b[1] - a[1]);
     const topCreative = sortedCreatives[0] ? { id: sortedCreatives[0][0], count: sortedCreatives[0][1] } : null;
     
-    return { total, clientes, novos, txConversao, topCreative, creativeCounts, originCounts };
+    return { total, clientes, novos, txConversao, topCreative, creativeCounts, originCounts, clientOriginCounts };
   }, [filtered]);
 
   const originData = useMemo(() => {
@@ -211,12 +223,6 @@ export default function CRM() {
       color: STATUS_CONFIG[k]?.color || "#6B7280",
     })).sort((a, b) => b.value - a.value);
   }, [filtered]);
-
-  const creativeData = useMemo(() => {
-    return Object.entries(kpis.creativeCounts)
-      .map(([id, count]) => ({ name: id.length > 15 ? id.substring(0, 15) + "..." : id, fullName: id, leads: count }))
-      .sort((a, b) => b.leads - a.leads).slice(0, 5);
-  }, [kpis.creativeCounts]);
 
   const timelineData = useMemo(() => {
     const map: Record<string, number> = {};
@@ -296,7 +302,21 @@ export default function CRM() {
         {/* KPI CARDS */}
         <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 28 }}>
           <StatCard label="Total de Leads" value={kpis.total} sub={`com filtros aplicados`} accent="#6EE7FA" />
-          <StatCard label="Clientes" value={kpis.clientes} sub="status = cliente" accent="#00E5A0" />
+          <StatCard 
+            label="Clientes" 
+            value={kpis.clientes} 
+            sub={
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {Object.entries(kpis.clientOriginCounts).map(([origin, count]) => (
+                  <div key={origin} style={{ display: "flex", justifyContent: "space-between", opacity: 0.8 }}>
+                    <span>{origin}:</span>
+                    <span style={{ fontWeight: 700 }}>{count}</span>
+                  </div>
+                ))}
+              </div>
+            } 
+            accent="#00E5A0" 
+          />
           <StatCard label="Melhor Criativo" value={kpis.topCreative ? kpis.topCreative.count : 0} sub={kpis.topCreative ? `ID: ${kpis.topCreative.id}` : "Nenhum detectado"} accent="#F472B6" icon={Trophy} href={kpis.topCreative?.id} />
           <StatCard label="Tx. Conversão" value={`${kpis.txConversao}%`} sub="leads → clientes" accent="#A78BFA" />
           <StatCard label="Novos Leads" value={kpis.novos} sub="aguardando atendimento" accent="#FCD34D" />
