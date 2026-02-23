@@ -5,12 +5,13 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { RefreshCw, Trophy, ExternalLink, LayoutGrid, List, LogOut, Share2 } from "lucide-react";
+import { RefreshCw, Trophy, ExternalLink, LayoutGrid, List, LogOut, Share2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KanbanBoard } from "@/components/crm/KanbanBoard";
 import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
+import { exportToExcel } from "@/utils/exportUtils";
 
 // ─── CONFIGURAÇÃO DE STATUS / ORIGEM ───────────────────────────────────────────
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -53,7 +54,7 @@ function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: stri
         width: 80, height: 80,
         background: `radial-gradient(circle at top right, ${accent}22, transparent 70%)`,
       }} />
-      <div style={{ display: "flex", alignItems: "center", justifyBetween: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {Icon && <Icon size={14} style={{ color: accent }} />}
           <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
@@ -133,6 +134,16 @@ export default function CRM() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
+  };
+
+  const handleExport = () => {
+    if (filtered.length === 0) {
+      showError("Não há dados para exportar com os filtros atuais.");
+      return;
+    }
+    const fileName = `Relatorio_Leads_${new Date().toISOString().split('T')[0]}`;
+    exportToExcel(filtered, fileName);
+    showSuccess("Relatório gerado com sucesso!");
   };
 
   useEffect(() => {
@@ -270,6 +281,9 @@ export default function CRM() {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
+            <Button variant="outline" onClick={handleExport} className="bg-green-600/10 border-green-600/20 text-green-400 hover:bg-green-600/20 h-11 rounded-xl">
+              <Download className="mr-2 h-4 w-4" /> Exportar
+            </Button>
             <Button variant="outline" onClick={fetchLeads} disabled={loading} className="bg-white/5 border-white/10 text-white hover:bg-white/10 h-11 rounded-xl">
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
             </Button>
