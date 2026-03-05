@@ -122,13 +122,35 @@ export default function CRM() {
   const fetchLeads = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('dados_cliente')
-        .select("*")
-        .order("created_at", { ascending: false });
+      let allLeads: any[] = [];
+      let from = 0;
+      let to = 999;
+      let hasMore = true;
+
+      // Loop para buscar todos os registros, contornando o limite de 1000 do Supabase
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('dados_cliente')
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(from, to);
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          allLeads = [...allLeads, ...data];
+          if (data.length < 1000) {
+            hasMore = false;
+          } else {
+            from += 1000;
+            to += 1000;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
       
-      if (error) throw error;
-      setLeads(data || []);
+      setLeads(allLeads);
     } catch (e: any) {
       showError("Erro ao conectar: " + e.message);
     } finally {
