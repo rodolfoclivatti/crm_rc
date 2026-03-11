@@ -208,9 +208,15 @@ export default function CRM() {
 
   const kpis = useMemo(() => {
     const total = filtered.length;
-    const clientesList = filtered.filter(l => (l.STATUS || "").toLowerCase() === "cliente");
+    const clientesList = filtered.filter(l => (l.STATUS || "").toLowerCase() === "cliente" || (l.STATUS || "").toLowerCase() === "concluido");
     const clientes = clientesList.length;
-    const novos = filtered.filter(l => (l.STATUS || "").toLowerCase() === "novo" || (l.STATUS || "").toUpperCase() === "PENDENTE").length;
+    
+    // Lógica unificada para "Novos Leads" (Novo ou Pendente)
+    const novos = filtered.filter(l => {
+      const s = (l.STATUS || "").toLowerCase();
+      return s === "novo" || s === "pendente";
+    }).length;
+
     const txConversao = total > 0 ? ((clientes / total) * 100).toFixed(1) : "0";
     
     const originCounts: Record<string, number> = {};
@@ -468,7 +474,7 @@ export default function CRM() {
                   </tbody>
                 </table>
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyBetween: "space-between", padding: "14px 24px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                 <span style={{ fontSize: 12, color: "#6B7280", fontFamily: "'DM Mono', monospace" }}>{filtered.length} leads · página {page} de {totalPages || 1}</span>
                 <div style={{ display: "flex", gap: 6 }}>
                   {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
