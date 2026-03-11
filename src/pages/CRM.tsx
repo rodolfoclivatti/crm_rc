@@ -55,7 +55,7 @@ function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: stri
         width: 80, height: 80,
         background: `radial-gradient(circle at top right, ${accent}22, transparent 70%)`,
       }} />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyBetween: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {Icon && <Icon size={14} style={{ color: accent }} />}
           <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
@@ -127,7 +127,6 @@ export default function CRM() {
       let to = 999;
       let hasMore = true;
 
-      // Loop para buscar todos os registros, contornando o limite de 1000 do Supabase
       while (hasMore) {
         const { data, error } = await supabase
           .from('dados_cliente')
@@ -184,6 +183,16 @@ export default function CRM() {
 
   const filtered = useMemo(() => {
     return leads.filter((l) => {
+      // FILTRO DE ORIGEM: Apenas Meta ou Google (ignora vazios ou orgânicos)
+      const origin = (l.ORIGEM || "").toLowerCase();
+      const isValidOrigin = origin.includes("meta") || 
+                           origin.includes("google") || 
+                           origin.includes("facebook") || 
+                           origin.includes("instagram") ||
+                           origin.includes("ads");
+      
+      if (!isValidOrigin) return false;
+
       const d = new Date(l.created_at);
       if (dateFrom && d < new Date(dateFrom)) return false;
       if (dateTo && d > new Date(dateTo + "T23:59:59")) return false;
@@ -206,13 +215,13 @@ export default function CRM() {
     
     const originCounts: Record<string, number> = {};
     filtered.forEach(l => { 
-      const o = l.ORIGEM || "Orgânico";
+      const o = l.ORIGEM || "Desconhecido";
       originCounts[o] = (originCounts[o] || 0) + 1; 
     });
 
     const clientOriginCounts: Record<string, number> = {};
     clientesList.forEach(l => {
-      const o = l.ORIGEM || "Orgânico";
+      const o = l.ORIGEM || "Desconhecido";
       clientOriginCounts[o] = (clientOriginCounts[o] || 0) + 1;
     });
     
