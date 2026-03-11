@@ -55,7 +55,7 @@ function StatCard({ label, value, sub, accent, icon: Icon, href }: { label: stri
         width: 80, height: 80,
         background: `radial-gradient(circle at top right, ${accent}22, transparent 70%)`,
       }} />
-      <div style={{ display: "flex", alignItems: "center", justifyBetween: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {Icon && <Icon size={14} style={{ color: accent }} />}
           <span style={{ fontSize: 12, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'DM Mono', monospace" }}>
@@ -181,9 +181,9 @@ export default function CRM() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchLeads]);
 
-  const filtered = useMemo(() => {
+  // 1. Filtro Base (Data e Origem) - Usado para os KPIs do topo
+  const baseFiltered = useMemo(() => {
     return leads.filter((l) => {
-      // FILTRO DE ORIGEM: Apenas Meta ou Google (ignora vazios ou orgânicos)
       const origin = (l.ORIGEM || "").toLowerCase();
       const isValidOrigin = origin.includes("meta") || 
                            origin.includes("google") || 
@@ -196,25 +196,43 @@ export default function CRM() {
       const d = new Date(l.created_at);
       if (dateFrom && d < new Date(dateFrom)) return false;
       if (dateTo && d > new Date(dateTo + "T23:59:59")) return false;
+      
+      return true;
+    });
+  }, [leads, dateFrom, dateTo]);
+
+  // 2. Filtro de Interface (Busca e Status) - Usado para a Tabela/Kanban
+  const filtered = useMemo(() => {
+    return baseFiltered.filter((l) => {
       const status = (l.STATUS || "").toLowerCase();
       if (filterStatus !== "todos" && status !== filterStatus.toLowerCase()) return false;
+      
       if (search) {
         const q = search.toLowerCase();
-        if (!l.nomewpp?.toLowerCase().includes(q) && !l.telefone?.includes(q) && !l.ASSUNTO?.toLowerCase().includes(q) && !l.ORIGEM?.toLowerCase().includes(q)) return false;
+        if (!l.nomewpp?.toLowerCase().includes(q) && 
+            !l.telefone?.includes(q) && 
+            !l.ASSUNTO?.toLowerCase().includes(q) && 
+            !l.ORIGEM?.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [leads, search, filterStatus, dateFrom, dateTo]);
+  }, [baseFiltered, search, filterStatus]);
 
   const kpis = useMemo(() => {
-    const total = filtered.length;
-    const clientesList = filtered.filter(l => (l.STATUS || "").toLowerCase() === "cliente");
+    const total = baseFiltered.length;
+    const clientesList = baseFiltered.filter(l => (l.STATUS || "").toLowerCase() === "cliente" || (l.STATUS || "").toUpperCase() === "CONCLUIDO");
     const clientes = clientesList.length;
-    const novos = filtered.filter(l => (l.STATUS || "").toLowerCase() === "novo" || (l.STATUS || "").toUpperCase() === "PENDENTE").length;
+    
+    // Contagem de Novos: Considera 'novo' ou 'PENDENTE'
+    const novos = baseFiltered.filter(l => {
+      const s = (l.STATUS || "").toLowerCase();
+      return s === "novo" || s === "pendente";
+    }).length;
+
     const txConversao = total > 0 ? ((clientes / total) * 100).toFixed(1) : "0";
     
     const originCounts: Record<string, number> = {};
-    filtered.forEach(l => { 
+    baseFiltered.forEach(l => { 
       const o = l.ORIGEM || "Desconhecido";
       originCounts[o] = (originCounts[o] || 0) + 1; 
     });
@@ -226,12 +244,12 @@ export default function CRM() {
     });
     
     const creativeCounts: Record<string, number> = {};
-    filtered.forEach(l => { if (l.eventId) creativeCounts[l.eventId] = (creativeCounts[l.eventId] || 0) + 1; });
+    baseFiltered.forEach(l => { if (l.eventId) creativeCounts[l.eventId] = (creativeCounts[l.eventId] || 0) + 1; });
     const sortedCreatives = Object.entries(creativeCounts).sort((a, b) => b[1] - a[1]);
     const topCreative = sortedCreatives[0] ? { id: sortedCreatives[0][0], count: sortedCreatives[0][1] } : null;
     
     return { total, clientes, novos, txConversao, topCreative, creativeCounts, originCounts, clientOriginCounts };
-  }, [filtered]);
+  }, [baseFiltered]);
 
   const originData = useMemo(() => {
     const COLORS = ["#6EE7FA", "#A78BFA", "#F472B6", "#00E5A0", "#FCD34D", "#F87171"];
@@ -244,7 +262,7 @@ export default function CRM() {
 
   const statusData = useMemo(() => {
     const counts: Record<string, number> = {};
-    filtered.forEach(l => { 
+    baseFiltered.forEach(l => { 
       const s = l.STATUS || "novo"; 
       counts[s] = (counts[s] || 0) + 1; 
     });
@@ -253,17 +271,17 @@ export default function CRM() {
       value: v,
       color: STATUS_CONFIG[k]?.color || "#6B7280",
     })).sort((a, b) => b.value - a.value);
-  }, [filtered]);
+  }, [baseFiltered]);
 
   const timelineData = useMemo(() => {
     const map: Record<string, number> = {};
-    filtered.forEach(l => {
+    baseFiltered.forEach(l => {
       const key = new Date(l.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
       map[key] = (map[key] || 0) + 1;
     });
-    const uniqueDates = Array.from(new Set(filtered.map(l => new Date(l.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })))).reverse();
+    const uniqueDates = Array.from(new Set(baseFiltered.map(l => new Date(l.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })))).reverse();
     return uniqueDates.map(k => ({ data: k, leads: map[k] })).slice(-30);
-  }, [filtered]);
+  }, [baseFiltered]);
 
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
@@ -332,7 +350,7 @@ export default function CRM() {
 
         {/* KPI CARDS */}
         <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 28 }}>
-          <StatCard label="Total de Leads" value={kpis.total} sub={`com filtros aplicados`} accent="#6EE7FA" />
+          <StatCard label="Total de Leads" value={kpis.total} sub={`no período selecionado`} accent="#6EE7FA" />
           <StatCard 
             label="Clientes" 
             value={kpis.clientes} 
@@ -407,7 +425,7 @@ export default function CRM() {
                     <span style={{ color: s.color, fontFamily: "'DM Mono', monospace" }}>{s.value}</span>
                   </div>
                   <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 99, height: 5 }}>
-                    <div style={{ background: s.color, borderRadius: 99, height: "100%", width: `${filtered.length > 0 ? (s.value / filtered.length * 100).toFixed(0) : 0}%`, transition: "width 0.6s ease" }} />
+                    <div style={{ background: s.color, borderRadius: 99, height: "100%", width: `${baseFiltered.length > 0 ? (s.value / baseFiltered.length * 100).toFixed(0) : 0}%`, transition: "width 0.6s ease" }} />
                   </div>
                 </div>
               ))}
