@@ -390,43 +390,50 @@ export default function CRM() {
           </div>
         </div>
 
-        {/* KPI CARDS */}
-        <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 28 }}>
-          <StatCard label="Total de Leads" value={kpis.total} sub={`com filtros aplicados`} accent="#6EE7FA" />
-          <StatCard 
-            label="Clientes" 
-            value={kpis.clientes} 
-            sub={
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                {Object.entries(kpis.clientOriginCounts).map(([origin, count]) => (
-                  <div key={origin} style={{ display: "flex", justifyContent: "space-between", opacity: 0.8 }}>
-                    <span>{origin}:</span>
-                    <span style={{ fontWeight: 700 }}>{count}</span>
+        {/* KPI CARDS - REORGANIZED 3 + 2 */}
+        <div className="fade-in space-y-4 mb-7">
+          {/* Row 1: 3 Cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+            <StatCard label="Total de Leads" value={kpis.total} sub={`com filtros aplicados`} accent="#6EE7FA" />
+            <StatCard 
+              label="Clientes" 
+              value={kpis.clientes} 
+              sub={
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  {Object.entries(kpis.clientOriginCounts).map(([origin, count]) => (
+                    <div key={origin} style={{ display: "flex", justifyContent: "space-between", opacity: 0.8 }}>
+                      <span>{origin}:</span>
+                      <span style={{ fontWeight: 700 }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              } 
+              accent="#00E5A0" 
+            />
+            <StatCard label="Região Principal" value={kpis.topRegion ? kpis.topRegion.name : "N/A"} sub={`${kpis.topRegion ? kpis.topRegion.count : 0} leads desta região`} accent="#FCD34D" icon={MapPin} />
+          </div>
+
+          {/* Row 2: 2 Cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+            <StatCard label="Melhor Criativo" value={kpis.topCreative ? kpis.topCreative.count : 0} sub={kpis.topCreative ? `ID: ${kpis.topCreative.id}` : "Nenhum detectado"} accent="#F472B6" icon={Trophy} href={kpis.topCreative?.id} />
+            <StatCard 
+              label="Tx. Conversão" 
+              value={`${kpis.txConversao}%`} 
+              sub={
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>DBA:</span>
+                    <span style={{ fontWeight: 700 }}>{kpis.dbaRate}%</span>
                   </div>
-                ))}
-              </div>
-            } 
-            accent="#00E5A0" 
-          />
-          <StatCard label="Região Principal" value={kpis.topRegion ? kpis.topRegion.name : "N/A"} sub={`${kpis.topRegion ? kpis.topRegion.count : 0} leads desta região`} accent="#FCD34D" icon={MapPin} />
-          <StatCard label="Melhor Criativo" value={kpis.topCreative ? kpis.topCreative.count : 0} sub={kpis.topCreative ? `ID: ${kpis.topCreative.id}` : "Nenhum detectado"} accent="#F472B6" icon={Trophy} href={kpis.topCreative?.id} />
-          <StatCard 
-            label="Tx. Conversão" 
-            value={`${kpis.txConversao}%`} 
-            sub={
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>DBA:</span>
-                  <span style={{ fontWeight: 700 }}>{kpis.dbaRate}%</span>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>RCV:</span>
+                    <span style={{ fontWeight: 700 }}>{kpis.rcvRate}%</span>
+                  </div>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>RCV:</span>
-                  <span style={{ fontWeight: 700 }}>{kpis.rcvRate}%</span>
-                </div>
-              </div>
-            } 
-            accent="#A78BFA" 
-          />
+              } 
+              accent="#A78BFA" 
+            />
+          </div>
         </div>
 
         {/* CHARTS ROW */}
