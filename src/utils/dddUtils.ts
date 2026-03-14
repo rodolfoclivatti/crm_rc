@@ -3,7 +3,8 @@ export const dddToState: Record<string, string> = {
   "21": "RJ", "22": "RJ", "24": "RJ",
   "27": "ES", "28": "ES",
   "31": "MG", "32": "MG", "33": "MG", "34": "MG", "35": "MG", "37": "MG", "38": "MG",
-  "41": "PR", "42": "PR", "43": "PR", "44": "PR", "45": "PR", "46": "PR",
+  "41": "Curitiba", // Separando Curitiba do resto do PR
+  "42": "PR", "43": "PR", "44": "PR", "45": "PR", "46": "PR",
   "47": "SC", "48": "SC", "49": "SC",
   "51": "RS", "53": "RS", "54": "RS", "55": "RS",
   "61": "DF",
