@@ -268,6 +268,19 @@ export default function CRM() {
       .slice(0, 6);
   }, [filtered]);
 
+  const originPieData = useMemo(() => {
+    const counts = { Meta: 0, Google: 0 };
+    filtered.forEach(l => {
+      const o = (l.ORIGEM || "").toLowerCase();
+      if (o.includes("meta") || o.includes("facebook") || o.includes("instagram")) counts.Meta++;
+      else if (o.includes("google") || o.includes("ads")) counts.Google++;
+    });
+    return [
+      { name: "Meta", value: counts.Meta, color: "#3B82F6" },
+      { name: "Google", value: counts.Google, color: "#F87171" }
+    ].filter(d => d.value > 0);
+  }, [filtered]);
+
   const regionData = useMemo(() => {
     return Object.entries(kpis.regionCounts)
       .map(([name, value]) => ({ name, value }))
@@ -387,7 +400,7 @@ export default function CRM() {
         </div>
 
         {/* CHARTS ROW */}
-        <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginBottom: 28 }}>
+        <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 28 }}>
           <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
             <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Leads por Período</div>
             <ResponsiveContainer width="100%" height={180}>
@@ -420,11 +433,33 @@ export default function CRM() {
                 <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 8 }}>
-              {assuntoData.slice(0, 3).map(o => (
+          </div>
+
+          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
+            <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Origem: Meta vs Google</div>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={originPieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={60}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {originPieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 8 }}>
+              {originPieData.map(o => (
                 <div key={o.name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: o.color }} />
-                  <span style={{ fontSize: 9, color: "#9CA3AF", maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
+                  <span style={{ fontSize: 10, color: "#9CA3AF" }}>{o.name}</span>
                 </div>
               ))}
             </div>
