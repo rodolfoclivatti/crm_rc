@@ -5,13 +5,14 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { RefreshCw, Trophy, ExternalLink, LayoutGrid, List, LogOut, Share2, Download } from "lucide-react";
+import { RefreshCw, Trophy, ExternalLink, LayoutGrid, List, LogOut, MapPin, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KanbanBoard } from "@/components/crm/KanbanBoard";
 import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { exportToExcel } from "@/utils/exportUtils";
+import { getRegionFromPhone } from "@/utils/dddUtils";
 
 // ─── CONFIGURAÇÃO DE STATUS / ORIGEM ───────────────────────────────────────────
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -220,9 +221,14 @@ export default function CRM() {
     const txConversao = total > 0 ? ((clientes / total) * 100).toFixed(1) : "0";
     
     const originCounts: Record<string, number> = {};
+    const regionCounts: Record<string, number> = {};
+    
     filtered.forEach(l => { 
       const o = l.ORIGEM || "Desconhecido";
       originCounts[o] = (originCounts[o] || 0) + 1; 
+      
+      const region = getRegionFromPhone(l.telefone);
+      regionCounts[region] = (regionCounts[region] || 0) + 1;
     });
 
     const clientOriginCounts: Record<string, number> = {};
@@ -235,8 +241,11 @@ export default function CRM() {
     filtered.forEach(l => { if (l.eventId) creativeCounts[l.eventId] = (creativeCounts[l.eventId] || 0) + 1; });
     const sortedCreatives = Object.entries(creativeCounts).sort((a, b) => b[1] - a[1]);
     const topCreative = sortedCreatives[0] ? { id: sortedCreatives[0][0], count: sortedCreatives[0][1] } : null;
+
+    const sortedRegions = Object.entries(regionCounts).sort((a, b) => b[1] - a[1]);
+    const topRegion = sortedRegions[0] ? { name: sortedRegions[0][0], count: sortedRegions[0][1] } : null;
     
-    return { total, clientes, novos, txConversao, topCreative, creativeCounts, originCounts, clientOriginCounts };
+    return { total, clientes, novos, txConversao, topCreative, creativeCounts, originCounts, clientOriginCounts, regionCounts, topRegion };
   }, [filtered]);
 
   const originData = useMemo(() => {
@@ -247,6 +256,13 @@ export default function CRM() {
       color: COLORS[index % COLORS.length]
     })).sort((a, b) => b.value - a.value);
   }, [kpis.originCounts]);
+
+  const regionData = useMemo(() => {
+    return Object.entries(kpis.regionCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+  }, [kpis.regionCounts]);
 
   const statusData = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -354,9 +370,9 @@ export default function CRM() {
             } 
             accent="#00E5A0" 
           />
+          <StatCard label="Região Principal" value={kpis.topRegion ? kpis.topRegion.name : "N/A"} sub={`${kpis.topRegion ? kpis.topRegion.count : 0} leads desta região`} accent="#FCD34D" icon={MapPin} />
           <StatCard label="Melhor Criativo" value={kpis.topCreative ? kpis.topCreative.count : 0} sub={kpis.topCreative ? `ID: ${kpis.topCreative.id}` : "Nenhum detectado"} accent="#F472B6" icon={Trophy} href={kpis.topCreative?.id} />
           <StatCard label="Tx. Conversão" value={`${kpis.txConversao}%`} sub="leads → clientes" accent="#A78BFA" />
-          <StatCard label="Novos Leads" value={kpis.novos} sub="aguardando atendimento" accent="#FCD34D" />
         </div>
 
         {/* CHARTS ROW */}
@@ -374,33 +390,15 @@ export default function CRM() {
           </div>
           
           <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
-            <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Origem dos Leads</div>
+            <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Distribuição por Estado</div>
             <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie
-                  data={originData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={40}
-                  outerRadius={60}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {originData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
+              <BarChart data={regionData}>
+                <XAxis dataKey="name" tick={{ fill: "#6B7280", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#6B7280", fontSize: 10 }} axisLine={false} tickLine={false} width={28} />
                 <Tooltip content={<CustomTooltip />} />
-              </PieChart>
+                <Bar dataKey="value" fill="#FCD34D" radius={[4, 4, 0, 0]} name="Leads" />
+              </BarChart>
             </ResponsiveContainer>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 8 }}>
-              {originData.slice(0, 3).map(o => (
-                <div key={o.name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: o.color }} />
-                  <span style={{ fontSize: 10, color: "#9CA3AF" }}>{o.name}</span>
-                </div>
-              ))}
-            </div>
           </div>
 
           <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
@@ -448,7 +446,7 @@ export default function CRM() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                      {["Data","Nome","Telefone","Origem","Assunto","Status Funil"].map(h => (
+                      {["Data","Nome","Telefone","Região","Origem","Status Funil"].map(h => (
                         <th key={h} style={{ padding: "14px 16px", textAlign: "left", fontSize: 10, color: "#6B7280", textTransform: "uppercase", letterSpacing: 1.2, fontFamily: "'DM Mono', monospace", fontWeight: 500, whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
@@ -456,17 +454,22 @@ export default function CRM() {
                   <tbody>
                     {paginated.map((lead) => {
                       const sc = STATUS_CONFIG[lead.STATUS] || { label: lead.STATUS, color: "#6B7280" };
+                      const region = getRegionFromPhone(lead.telefone);
                       return (
                         <tr key={lead.id} className="row-hover" onClick={() => handleLeadClick(lead)} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "background 0.15s", cursor: "pointer" }}>
                           <td style={{ padding: "12px 16px", fontSize: 12, color: "#9CA3AF", fontFamily: "'DM Mono', monospace" }}>{fmtFull(lead.created_at)}</td>
                           <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500 }}>{lead.nomewpp || "—"}</td>
                           <td style={{ padding: "12px 16px", fontSize: 12, color: "#9CA3AF", fontFamily: "'DM Mono', monospace" }}>{lead.telefone || "—"}</td>
                           <td style={{ padding: "12px 16px" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: "#FCD34D", background: "rgba(252,211,77,0.1)", padding: "2px 8px", borderRadius: 6 }}>
+                              {region}
+                            </span>
+                          </td>
+                          <td style={{ padding: "12px 16px" }}>
                             <span style={{ fontSize: 10, fontWeight: 700, color: "#6EE7FA", background: "rgba(110,231,250,0.1)", padding: "2px 8px", borderRadius: 6, textTransform: "uppercase" }}>
                               {lead.ORIGEM || "Orgânico"}
                             </span>
                           </td>
-                          <td style={{ padding: "12px 16px", fontSize: 13, color: "#D1D5DB", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lead.ASSUNTO || "—"}</td>
                           <td style={{ padding: "12px 16px" }}><span style={{ background: `${sc.color}18`, color: sc.color, padding: "3px 10px", borderRadius: 99, fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{sc.label}</span></td>
                         </tr>
                       );
@@ -474,7 +477,7 @@ export default function CRM() {
                   </tbody>
                 </table>
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyBetween: "space-between", padding: "14px 24px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                 <span style={{ fontSize: 12, color: "#6B7280", fontFamily: "'DM Mono', monospace" }}>{filtered.length} leads · página {page} de {totalPages || 1}</span>
                 <div style={{ display: "flex", gap: 6 }}>
                   {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
