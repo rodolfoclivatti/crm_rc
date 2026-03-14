@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { RefreshCw, Trophy, ExternalLink, LayoutGrid, List, LogOut, MapPin, Download } from "lucide-react";
+import { RefreshCw, Trophy, ExternalLink, LayoutGrid, List, LogOut, MapPin, Download, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KanbanBoard } from "@/components/crm/KanbanBoard";
 import { ClientDetailModal } from "@/components/crm/ClientDetailModal";
@@ -248,14 +248,23 @@ export default function CRM() {
     return { total, clientes, novos, txConversao, topCreative, creativeCounts, originCounts, clientOriginCounts, regionCounts, topRegion };
   }, [filtered]);
 
-  const originData = useMemo(() => {
-    const COLORS = ["#6EE7FA", "#A78BFA", "#F472B6", "#00E5A0", "#FCD34D", "#F87171"];
-    return Object.entries(kpis.originCounts).map(([name, value], index) => ({
-      name,
-      value,
-      color: COLORS[index % COLORS.length]
-    })).sort((a, b) => b.value - a.value);
-  }, [kpis.originCounts]);
+  const assuntoData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filtered.forEach(l => {
+      const a = l.ASSUNTO || "Não informado";
+      const label = a.length > 25 ? a.substring(0, 25) + "..." : a;
+      counts[label] = (counts[label] || 0) + 1;
+    });
+    const COLORS = ["#6EE7FA", "#A78BFA", "#F472B6", "#00E5A0", "#FCD34D", "#F87171", "#3B82F6"];
+    return Object.entries(counts)
+      .map(([name, value], index) => ({
+        name,
+        value,
+        color: COLORS[index % COLORS.length]
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+  }, [filtered]);
 
   const regionData = useMemo(() => {
     return Object.entries(kpis.regionCounts)
@@ -389,6 +398,36 @@ export default function CRM() {
             </ResponsiveContainer>
           </div>
           
+          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
+            <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Assunto dos Leads</div>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={assuntoData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={60}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {assuntoData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 8 }}>
+              {assuntoData.slice(0, 3).map(o => (
+                <div key={o.name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: o.color }} />
+                  <span style={{ fontSize: 9, color: "#9CA3AF", maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
             <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Distribuição por Estado</div>
             <ResponsiveContainer width="100%" height={180}>
