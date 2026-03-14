@@ -436,9 +436,10 @@ export default function CRM() {
           </div>
         </div>
 
-        {/* CHARTS ROW */}
-        <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 28 }}>
-          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
+        {/* CHARTS ROW - REORGANIZED 3 + 2 */}
+        <div className="fade-in grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-7">
+          {/* Row 1: 3 Items */}
+          <div className="lg:col-span-2" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
             <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Leads por Período</div>
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={timelineData}>
@@ -450,7 +451,7 @@ export default function CRM() {
             </ResponsiveContainer>
           </div>
           
-          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
+          <div className="lg:col-span-2" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
             <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Assunto dos Leads</div>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
@@ -480,7 +481,7 @@ export default function CRM() {
             </div>
           </div>
 
-          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
+          <div className="lg:col-span-2" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
             <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Origem: Meta vs Google</div>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
@@ -510,7 +511,8 @@ export default function CRM() {
             </div>
           </div>
 
-          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
+          {/* Row 2: 2 Items (Wider) */}
+          <div className="lg:col-span-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
             <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Distribuição por Estado</div>
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={regionData}>
@@ -522,7 +524,7 @@ export default function CRM() {
             </ResponsiveContainer>
           </div>
 
-          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
+          <div className="lg:col-span-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
             <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>Funil de Status</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {statusData.map(s => (
