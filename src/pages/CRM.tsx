@@ -209,7 +209,12 @@ export default function CRM() {
 
   const kpis = useMemo(() => {
     const total = filtered.length;
-    const clientesList = filtered.filter(l => (l.STATUS || "").toLowerCase() === "cliente" || (l.STATUS || "").toLowerCase() === "concluido");
+    const isClient = (s: string) => {
+      const status = (s || "").toLowerCase();
+      return status === "cliente" || status === "concluido";
+    };
+
+    const clientesList = filtered.filter(l => isClient(l.STATUS));
     const clientes = clientesList.length;
     
     // Lógica unificada para "Novos Leads" (Novo ou Pendente)
@@ -219,6 +224,15 @@ export default function CRM() {
     }).length;
 
     const txConversao = total > 0 ? ((clientes / total) * 100).toFixed(1) : "0";
+
+    // Cálculos específicos para DBA e RCV
+    const dbaLeads = filtered.filter(l => (l.ASSUNTO || "").toUpperCase().includes("DBA"));
+    const dbaClients = dbaLeads.filter(l => isClient(l.STATUS)).length;
+    const dbaRate = dbaLeads.length > 0 ? ((dbaClients / dbaLeads.length) * 100).toFixed(1) : "0";
+
+    const rcvLeads = filtered.filter(l => (l.ASSUNTO || "").toUpperCase().includes("RCV"));
+    const rcvClients = rcvLeads.filter(l => isClient(l.STATUS)).length;
+    const rcvRate = rcvLeads.length > 0 ? ((rcvClients / rcvLeads.length) * 100).toFixed(1) : "0";
     
     const originCounts: Record<string, number> = {};
     const regionCounts: Record<string, number> = {};
@@ -245,7 +259,7 @@ export default function CRM() {
     const sortedRegions = Object.entries(regionCounts).sort((a, b) => b[1] - a[1]);
     const topRegion = sortedRegions[0] ? { name: sortedRegions[0][0], count: sortedRegions[0][1] } : null;
     
-    return { total, clientes, novos, txConversao, topCreative, creativeCounts, originCounts, clientOriginCounts, regionCounts, topRegion };
+    return { total, clientes, novos, txConversao, dbaRate, rcvRate, topCreative, creativeCounts, originCounts, clientOriginCounts, regionCounts, topRegion };
   }, [filtered]);
 
   const assuntoData = useMemo(() => {
@@ -396,7 +410,23 @@ export default function CRM() {
           />
           <StatCard label="Região Principal" value={kpis.topRegion ? kpis.topRegion.name : "N/A"} sub={`${kpis.topRegion ? kpis.topRegion.count : 0} leads desta região`} accent="#FCD34D" icon={MapPin} />
           <StatCard label="Melhor Criativo" value={kpis.topCreative ? kpis.topCreative.count : 0} sub={kpis.topCreative ? `ID: ${kpis.topCreative.id}` : "Nenhum detectado"} accent="#F472B6" icon={Trophy} href={kpis.topCreative?.id} />
-          <StatCard label="Tx. Conversão" value={`${kpis.txConversao}%`} sub="leads → clientes" accent="#A78BFA" />
+          <StatCard 
+            label="Tx. Conversão" 
+            value={`${kpis.txConversao}%`} 
+            sub={
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>DBA:</span>
+                  <span style={{ fontWeight: 700 }}>{kpis.dbaRate}%</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>RCV:</span>
+                  <span style={{ fontWeight: 700 }}>{kpis.rcvRate}%</span>
+                </div>
+              </div>
+            } 
+            accent="#A78BFA" 
+          />
         </div>
 
         {/* CHARTS ROW */}
