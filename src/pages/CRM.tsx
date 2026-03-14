@@ -251,7 +251,9 @@ export default function CRM() {
   const assuntoData = useMemo(() => {
     const counts: Record<string, number> = {};
     filtered.forEach(l => {
-      const a = l.ASSUNTO || "Não informado";
+      const a = l.ASSUNTO;
+      if (!a || a.trim() === "") return; // Ignora se não informado
+      
       const label = a.length > 25 ? a.substring(0, 25) + "..." : a;
       counts[label] = (counts[label] || 0) + 1;
     });
